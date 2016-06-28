@@ -27,7 +27,6 @@ import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.hash.LinkedHashMap;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.kotlin.builtins.ReflectionTypes;
 import org.jetbrains.kotlin.descriptors.*;
 import org.jetbrains.kotlin.descriptors.impl.TypeAliasConstructorDescriptor;
 import org.jetbrains.kotlin.js.config.JsConfig;
@@ -35,6 +34,7 @@ import org.jetbrains.kotlin.js.config.LibrarySourcesConfig;
 import org.jetbrains.kotlin.js.translate.context.generator.Generator;
 import org.jetbrains.kotlin.js.translate.context.generator.Rule;
 import org.jetbrains.kotlin.js.translate.intrinsic.Intrinsics;
+import org.jetbrains.kotlin.js.translate.utils.AnnotationsUtils;
 import org.jetbrains.kotlin.js.translate.utils.JsAstUtils;
 import org.jetbrains.kotlin.name.FqName;
 import org.jetbrains.kotlin.resolve.BindingContext;
@@ -60,12 +60,15 @@ import static org.jetbrains.kotlin.resolve.calls.tasks.DynamicCallsKt.isDynamic;
  */
 public final class StaticContext {
 
-    public static StaticContext generateStaticContext(@NotNull BindingTrace bindingTrace, @NotNull JsConfig config, @NotNull ModuleDescriptor moduleDescriptor) {
+    public static StaticContext generateStaticContext(
+            @NotNull BindingTrace bindingTrace,
+            @NotNull JsConfig config
+    ) {
         JsProgram program = new JsProgram("main");
         Namer namer = Namer.newInstance(program.getRootScope());
         Intrinsics intrinsics = new Intrinsics();
         StandardClasses standardClasses = StandardClasses.bindImplementations(namer.getKotlinScope());
-        return new StaticContext(program, bindingTrace, namer, intrinsics, standardClasses, program.getRootScope(), config, moduleDescriptor);
+        return new StaticContext(program, bindingTrace, namer, intrinsics, standardClasses, program.getRootScope(), config);
     }
 
     @NotNull
@@ -81,9 +84,6 @@ public final class StaticContext {
 
     @NotNull
     private final StandardClasses standardClasses;
-
-    @NotNull
-    private final ReflectionTypes reflectionTypes;
 
     @NotNull
     private final JsScope rootScope;
@@ -124,8 +124,7 @@ public final class StaticContext {
             @NotNull Intrinsics intrinsics,
             @NotNull StandardClasses standardClasses,
             @NotNull JsScope rootScope,
-            @NotNull JsConfig config,
-            @NotNull ModuleDescriptor moduleDescriptor
+            @NotNull JsConfig config
     ) {
         this.program = program;
         this.bindingTrace = bindingTrace;
@@ -134,7 +133,6 @@ public final class StaticContext {
         this.rootScope = rootScope;
         this.standardClasses = standardClasses;
         this.config = config;
-        this.reflectionTypes = new ReflectionTypes(moduleDescriptor);
     }
 
     @NotNull
@@ -160,11 +158,6 @@ public final class StaticContext {
     @NotNull
     public Namer getNamer() {
         return namer;
-    }
-
-    @NotNull
-    public ReflectionTypes getReflectionTypes() {
-        return reflectionTypes;
     }
 
     @NotNull
@@ -267,6 +260,15 @@ public final class StaticContext {
     private final class NameGenerator extends Generator<JsName> {
 
         public NameGenerator() {
+            Rule<JsName> jsModuleNames = new Rule<JsName>() {
+                @Nullable
+                @Override
+                public JsName apply(@NotNull DeclarationDescriptor descriptor) {
+                    String moduleName = AnnotationsUtils.getModuleName(descriptor);
+                    return moduleName != null ? getModuleInternalName(moduleName) : null;
+                }
+            };
+
             Rule<JsName> namesForDynamic = new Rule<JsName>() {
                 @Override
                 @Nullable
@@ -423,6 +425,7 @@ public final class StaticContext {
                 }
             };
 
+            addRule(jsModuleNames);
             addRule(namesForDynamic);
             addRule(localClasses);
             addRule(namesForStandardClasses);
@@ -648,14 +651,23 @@ public final class StaticContext {
 
         if (LibrarySourcesConfig.UNKNOWN_EXTERNAL_MODULE_NAME.equals(moduleName)) return null;
 
-        JsName moduleId = moduleName.equals(Namer.KOTLIN_LOWER_NAME) ? rootScope.declareName(Namer.KOTLIN_NAME) :
-                          importedModules.get(moduleName);
-        if (moduleId == null) {
-            moduleId = rootScope.declareFreshName(Namer.LOCAL_MODULE_PREFIX + Namer.suggestedModuleName(moduleName));
-            importedModules.put(moduleName, moduleId);
-        }
+        return getModuleReference(moduleName);
+    }
 
-        return JsAstUtils.pureFqn(moduleId, null);
+    @NotNull
+    private JsNameRef getModuleReference(@NotNull String baseName) {
+        return JsAstUtils.pureFqn(getModuleInternalName(baseName), null);
+    }
+
+    @NotNull
+    private JsName getModuleInternalName(@NotNull String baseName) {
+        JsName moduleId = baseName.equals(Namer.KOTLIN_LOWER_NAME) ? rootScope.declareName(Namer.KOTLIN_NAME) :
+                          importedModules.get(baseName);
+        if (moduleId == null) {
+            moduleId = rootScope.declareFreshName(Namer.LOCAL_MODULE_PREFIX + Namer.suggestedModuleName(baseName));
+            importedModules.put(baseName, moduleId);
+        }
+        return moduleId;
     }
 
     private static JsExpression applySideEffects(JsExpression expression, DeclarationDescriptor descriptor) {
@@ -673,6 +685,14 @@ public final class StaticContext {
     private static class QualifierIsNullGenerator extends Generator<Boolean> {
 
         private QualifierIsNullGenerator() {
+            Rule<Boolean> jsModule = new Rule<Boolean>() {
+                @Nullable
+                @Override
+                public Boolean apply(@NotNull DeclarationDescriptor descriptor) {
+                    String moduleName = AnnotationsUtils.getModuleName(descriptor);
+                    return moduleName != null ? true : null;
+                }
+            };
             Rule<Boolean> propertiesInClassHaveNoQualifiers = new Rule<Boolean>() {
                 @Override
                 public Boolean apply(@NotNull DeclarationDescriptor descriptor) {
@@ -682,6 +702,7 @@ public final class StaticContext {
                     return null;
                 }
             };
+            addRule(jsModule);
             addRule(propertiesInClassHaveNoQualifiers);
         }
     }

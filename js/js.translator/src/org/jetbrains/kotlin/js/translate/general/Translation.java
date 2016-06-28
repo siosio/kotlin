@@ -21,7 +21,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns;
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor;
-import org.jetbrains.kotlin.descriptors.ModuleDescriptor;
 import org.jetbrains.kotlin.idea.MainFunctionDetector;
 import org.jetbrains.kotlin.js.config.JSConfigurationKeys;
 import org.jetbrains.kotlin.js.config.JsConfig;
@@ -228,11 +227,10 @@ public final class Translation {
             @NotNull BindingTrace bindingTrace,
             @NotNull Collection<KtFile> files,
             @NotNull MainCallParameters mainCallParameters,
-            @NotNull ModuleDescriptor moduleDescriptor,
             @NotNull JsConfig config
     ) throws TranslationException {
         try {
-            return doGenerateAst(bindingTrace, files, mainCallParameters, moduleDescriptor, config);
+            return doGenerateAst(bindingTrace, files, mainCallParameters, config);
         }
         catch (UnsupportedOperationException e) {
             throw new UnsupportedFeatureException("Unsupported feature used.", e);
@@ -247,10 +245,9 @@ public final class Translation {
             @NotNull BindingTrace bindingTrace,
             @NotNull Collection<KtFile> files,
             @NotNull MainCallParameters mainCallParameters,
-            @NotNull ModuleDescriptor moduleDescriptor,
             @NotNull JsConfig config
     ) {
-        StaticContext staticContext = StaticContext.generateStaticContext(bindingTrace, config, moduleDescriptor);
+        StaticContext staticContext = StaticContext.generateStaticContext(bindingTrace, config);
         JsProgram program = staticContext.getProgram();
 
         JsFunction rootFunction = JsAstUtils.createFunctionWithEmptyBody(program.getScope());
