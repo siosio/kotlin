@@ -527,6 +527,16 @@ public final class StaticContext {
 
     private final class QualifierGenerator extends Generator<JsExpression> {
         public QualifierGenerator() {
+            Rule<JsExpression> topLevelDeclarationInJsModule = new Rule<JsExpression>() {
+                @Nullable
+                @Override
+                public JsExpression apply(@NotNull DeclarationDescriptor descriptor) {
+                    if (!AnnotationsUtils.isNativeObject(descriptor)) return null;
+
+                    String moduleName = AnnotationsUtils.getFileModuleName(getBindingContext(), descriptor);
+                    return moduleName != null ? getModuleReference(moduleName) : null;
+                }
+            };
             Rule<JsExpression> standardObjectsHaveKotlinQualifier = new Rule<JsExpression>() {
                 @Override
                 public JsExpression apply(@NotNull DeclarationDescriptor descriptor) {
@@ -633,6 +643,7 @@ public final class StaticContext {
                 }
             };
 
+            addRule(topLevelDeclarationInJsModule);
             addRule(libraryObjectsHaveKotlinQualifier);
             addRule(constructorOrCompanionObjectHasTheSameQualifierAsTheClass);
             addRule(standardObjectsHaveKotlinQualifier);
