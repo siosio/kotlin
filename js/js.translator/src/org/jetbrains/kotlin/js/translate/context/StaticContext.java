@@ -518,7 +518,7 @@ public final class StaticContext {
     }
 
     @Nullable
-    public JsExpression getQualifierForDescriptor(@NotNull DeclarationDescriptor descriptor) {
+    private JsExpression getQualifierForDescriptor(@NotNull DeclarationDescriptor descriptor) {
         if (qualifierIsNull.get(descriptor.getOriginal()) != null) {
             return null;
         }
