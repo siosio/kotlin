@@ -124,4 +124,8 @@ public final class OperatorOverloadingTest extends SingleFileTranslationTest {
     public void testLambdaRhs() throws Exception {
         checkFooBoxIsOk();
     }
+
+    public void testAugmentedAssignmentLhs() throws Exception {
+        checkFooBoxIsOk();
+    }
 }
