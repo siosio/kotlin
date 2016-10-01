@@ -719,27 +719,44 @@ fun aggregates(): List<GenericFunction> {
         }
     }
 
-    templates add f("onEach(action: (T) -> Unit)") {
-        inline(true)
 
-        doc { f -> "Performs the given [action] on each ${f.element} and returns the receiver afterwards." }
+    templates addAll listOf(Iterables, Maps, CharSequences).map { f -> f("onEach(action: (T) -> Unit)") {
+        only(f)
+        inline(true)
+        doc { f -> "Performs the given [action] on each ${f.element} and returns the ${f.collection} itself afterwards." }
+        val collectionType = when(f) {
+            Maps -> "M"
+            CharSequences -> "S"
+            else -> "C"
+        }
+        customReceiver(collectionType)
+        returns(collectionType)
+        typeParam("$collectionType : SELF")
+
+        body {
+            """
+            return apply { for (element in (this as SELF)) action(element) }
+            """
+        }
+    }}
+
+    templates add f("onEach(action: (T) -> Unit)") {
+        only(InvariantArraysOfObjects, ArraysOfPrimitives, Sequences)
+        inline(true)
         returns("SELF")
+        doc { f -> "Performs the given [action] on each ${f.element} and returns the ${f.collection} itself afterwards." }
         body {
             """
             return apply { for (element in this) action(element) }
             """
         }
-        include(Maps, CharSequences)
 
-        exclude(Iterables)
-        typeParam(Generic) { "I: Iterable<E>" }
-        typeParam(Generic) { "E" }
-        customReceiver(Generic) { "I" }
-        returns(Generic) { "I" }
-
-        doc(Sequences) { f -> "Applies the supplied [action] on each ${f.element} of the Sequence as they pass through it." }
+        doc(Sequences) { f ->
+            """
+            Returns a sequence which performs the given [action] on each ${f.element} of the original sequence as they pass though it.
+            """
+        }
         inline(false, Sequences)
-        returns(Sequences) { "Sequence<T>" }
         body(Sequences) {
             """
             return map {
