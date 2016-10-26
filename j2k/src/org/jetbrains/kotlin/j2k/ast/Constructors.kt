@@ -39,6 +39,8 @@ class PrimaryConstructor(
 
     override fun generateCode(builder: CodeBuilder) { throw IncorrectOperationException() }
 
+    // Should be lazy, to defer `assignPrototypesFrom(this,...)` a bit,
+    // cause when `PrimaryConstructor` created prototypes not yet assigned
     val initializer: Initializer by
     lazy { Initializer(body, Modifiers.Empty).assignPrototypesFrom(this, CommentsAndSpacesInheritance(commentsBefore = false)) }
 

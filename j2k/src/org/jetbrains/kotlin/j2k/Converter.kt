@@ -209,13 +209,15 @@ class Converter private constructor(
             }
         }.assignPrototype(psiClass)
 
-        if(converted.body.primaryConstructorSignature == null)
+        if (converted.body.primaryConstructorSignature == null)
             addPostUnfoldDeferredElementsAction {
                 val primaryConstructor = converted.body.primaryConstructor
-                if(primaryConstructor?.initializer?.isEmpty == false)
-                    primaryConstructor.initializer.assignPrototypesFrom(primaryConstructor, CommentsAndSpacesInheritance.NO_SPACES)
-                else if(primaryConstructor != null)
-                    converted.prototypes =  converted.prototypes!! + primaryConstructor.prototypes!!
+                if (primaryConstructor != null) {
+                    if (primaryConstructor.initializer.isEmpty)
+                        converted.prototypes = converted.prototypes!! + primaryConstructor.prototypes!!
+                    else
+                        primaryConstructor.initializer.assignPrototypesFrom(primaryConstructor, CommentsAndSpacesInheritance.NO_SPACES)
+                }
             }
         return converted
     }
