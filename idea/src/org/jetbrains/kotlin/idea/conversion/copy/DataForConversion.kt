@@ -23,12 +23,16 @@ import com.intellij.psi.*
 import org.jetbrains.kotlin.builtins.DefaultBuiltIns
 import org.jetbrains.kotlin.name.FqNameUnsafe
 import org.jetbrains.kotlin.platform.JavaToKotlinClassMap
-import org.jetbrains.kotlin.psi.psiUtil.*
-import java.util.ArrayList
+import org.jetbrains.kotlin.psi.psiUtil.allChildren
+import org.jetbrains.kotlin.psi.psiUtil.elementsInRange
+import org.jetbrains.kotlin.psi.psiUtil.parentsWithSelf
+import org.jetbrains.kotlin.psi.psiUtil.siblings
+import java.util.*
 
 data class DataForConversion private constructor(
         val elementsAndTexts: Collection<Any> /* list consisting of PsiElement's to convert and plain String's */,
-        val importsAndPackage: String
+        val importsAndPackage: String,
+        val file: PsiJavaFile
 ) {
     companion object {
         fun prepare(copiedCode: CopiedJavaCode, project: Project): DataForConversion  {
@@ -52,7 +56,7 @@ data class DataForConversion private constructor(
                 elementsAndTexts.collectElementsToConvert(file, fileText, TextRange(startOffsets[i], endOffsets[i]))
             }
 
-            return DataForConversion(elementsAndTexts, importsAndPackage)
+            return DataForConversion(elementsAndTexts, importsAndPackage, file)
         }
 
         private fun clipTextIfNeeded(file: PsiJavaFile, fileText: String, startOffsets: IntArray, endOffsets: IntArray): String? {
