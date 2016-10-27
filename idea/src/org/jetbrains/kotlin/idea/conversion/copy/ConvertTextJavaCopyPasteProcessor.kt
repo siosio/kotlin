@@ -136,7 +136,7 @@ class ConvertTextJavaCopyPasteProcessor : CopyPastePostProcessor<TextBlockTransf
     }
 
     private fun DataForConversion.convertCodeToKotlin(project: Project): ConversionResult {
-        return convertCopiedCodeToKotlin(this.elementsAndTexts, project)
+        return convertCopiedCodeToKotlin(elementsAndTexts, project)
     }
 
     private val KtElement.pasteContext: KotlinContext
@@ -225,14 +225,14 @@ class ConvertTextJavaCopyPasteProcessor : CopyPastePostProcessor<TextBlockTransf
         return PsiFileFactory.getInstance(project).createFileFromText("Dummy.java", fileType, text, LocalTimeCounter.currentTime(), true)
     }
 
-    private fun DataForConversion.tryResolveImports(targetFile: KtFile): List<Any> {
-        val importResolutionUtil = ImportResolutionUtil(this, targetFile)
+    private fun DataForConversion.tryResolveImports(targetFile: KtFile): ElementAndTextList {
+        val importResolutionUtil = PlainTextPasteImportResolver(this, targetFile)
         importResolutionUtil.addImportsFromTargetFile()
         importResolutionUtil.tryResolveReferences()
-        return importResolutionUtil.addedImports.flatMap { listOf("\n", it) } + "\n\n" //TODO Non-manual formatting for import list
+        return ElementAndTextList(importResolutionUtil.addedImports.flatMap { listOf("\n", it) } + "\n\n") //TODO Non-manual formatting for import list
     }
 
-    private fun convertImportsToKotlin(imports: List<Any>, project: Project): ConversionResult {
+    private fun convertImportsToKotlin(imports: ElementAndTextList, project: Project): ConversionResult {
         return convertCopiedCodeToKotlin(imports, project)
     }
 

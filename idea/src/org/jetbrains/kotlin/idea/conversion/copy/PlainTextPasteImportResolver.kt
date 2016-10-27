@@ -36,7 +36,7 @@ import org.jetbrains.kotlin.psi.KtImportDirective
 import java.util.*
 
 
-class ImportResolutionUtil(dataForConversion: DataForConversion, val targetFile: KtFile) {
+class PlainTextPasteImportResolver(dataForConversion: DataForConversion, val targetFile: KtFile) {
 
     private val file = dataForConversion.file
     private val project = targetFile.project
@@ -71,38 +71,36 @@ class ImportResolutionUtil(dataForConversion: DataForConversion, val targetFile:
 
     fun addImportsFromTargetFile() {
 
-        fun tryConvertKotlinImport(it: KtImportDirective) {
-            val importPath = it.importPath
-            val importedReference = it.importedReference
-            if (importPath != null && !importPath.hasAlias()) {
-                if (importedReference is KtDotQualifiedExpression) {
-                    val receiver = importedReference
-                            .receiverExpression
-                            .referenceExpression()
-                            ?.mainReference
-                            ?.resolve()
-                    val selector = importedReference
-                            .selectorExpression
-                            ?.referenceExpression()
-                            ?.mainReference
-                            ?.resolve()
+        fun tryConvertKotlinImport(importDirective: KtImportDirective) {
+            val importPath = importDirective.importPath
+            val importedReference = importDirective.importedReference
+            if (importPath != null && !importPath.hasAlias() && importedReference is KtDotQualifiedExpression) {
+                val receiver = importedReference
+                        .receiverExpression
+                        .referenceExpression()
+                        ?.mainReference
+                        ?.resolve()
+                val selector = importedReference
+                        .selectorExpression
+                        ?.referenceExpression()
+                        ?.mainReference
+                        ?.resolve()
 
-                    val isPackageReceiver = receiver is PsiPackage
-                    val isClassReceiver = receiver is PsiClass
-                    val isClassSelector = selector is PsiClass
+                val isPackageReceiver = receiver is PsiPackage
+                val isClassReceiver = receiver is PsiClass
+                val isClassSelector = selector is PsiClass
 
-                    if (importPath.isAllUnder) {
-                        if (isClassReceiver)
-                            psiElementFactory.createImportStaticStatement(receiver as PsiClass, "*")
-                        else if (isPackageReceiver)
-                            psiElementFactory.createImportStatementOnDemand((receiver as PsiPackage).qualifiedName)
-                    }
-                    else {
-                        if (isPackageReceiver && isClassSelector)
-                            psiElementFactory.createImportStatement(selector as PsiClass)
-                        else if (isClassReceiver)
-                            psiElementFactory.createImportStaticStatement(receiver as PsiClass, importPath.importedName!!.asString())
-                    }
+                if (importPath.isAllUnder) {
+                    if (isClassReceiver)
+                        psiElementFactory.createImportStaticStatement(receiver as PsiClass, "*")
+                    else if (isPackageReceiver)
+                        psiElementFactory.createImportStatementOnDemand((receiver as PsiPackage).qualifiedName)
+                }
+                else {
+                    if (isPackageReceiver && isClassSelector)
+                        psiElementFactory.createImportStatement(selector as PsiClass)
+                    else if (isClassReceiver)
+                        psiElementFactory.createImportStaticStatement(receiver as PsiClass, importPath.importedName!!.asString())
                 }
             }
         }
@@ -122,7 +120,7 @@ class ImportResolutionUtil(dataForConversion: DataForConversion, val targetFile:
         fun tryResolveReference(reference: PsiQualifiedReference): Boolean {
             if (reference.resolve() != null) return true
             val referenceName = reference.referenceName!!
-            if (failedToResolveReferenceNames.contains(referenceName)) return false
+            if (referenceName in failedToResolveReferenceNames) return false
             val classes = shortNameCache.getClassesByName(referenceName, scope)
                     .map { it to it.resolveToDescriptor(resolutionFacade) }
                     .filter(this::canBeImported)
@@ -135,14 +133,9 @@ class ImportResolutionUtil(dataForConversion: DataForConversion, val targetFile:
                 addImport(psiElementFactory.createImportStatement(psiClass), true)
             }
 
-            if (reference.resolve() != null) {
-                //println("Succeed resolving import ${(reference.resolve()!! as PsiClass).qualifiedName}")
-                return true
-            }
+            if (reference.resolve() != null) return true
             else {
                 if (classes.isNotEmpty()) {
-                    //println("Failed resolving import ${reference.canonicalText} due ambiguity")
-                    //classes.forEach { println(it.first.qualifiedName) }
                     ambiguityInResolution = true
                     return false
                 }
@@ -158,19 +151,12 @@ class ImportResolutionUtil(dataForConversion: DataForConversion, val targetFile:
                 addImport(psiElementFactory.createImportStaticStatement(psiMember.containingClass!!, psiMember.name!!), true)
             }
 
-            if (reference.resolve() != null) {
-                //val member = (reference.resolve()!! as PsiMember)
-                //println("Succeed resolving import static ${member.containingClass!!.qualifiedName}.${member.name}")
-                return false
-            }
+            if (reference.resolve() != null) return false
             else {
                 if (members.isNotEmpty()) {
-                    //println("Failed resolving import static ${reference.canonicalText} due ambiguity")
-                    //members.forEach { println("${it.first.containingClass!!.qualifiedName}.${it.first.name}") }
                     ambiguityInResolution = true
                 }
                 else {
-                    //println("Failed resolving import ${reference.canonicalText}")
                     couldNotResolve = true
                 }
             }

@@ -198,13 +198,13 @@ internal class ConversionResult(
         val textChanged: Boolean
 )
 
-internal fun convertCopiedCodeToKotlin(elementsAndTexts: Collection<Any>, project: Project): ConversionResult {
+internal fun convertCopiedCodeToKotlin(elementsAndTextsList: ElementAndTextList, project: Project): ConversionResult {
     val converter = JavaToKotlinConverter(
             project,
             ConverterSettings.defaultSettings,
             IdeaJavaToKotlinServices
     )
-
+    val elementsAndTexts = elementsAndTextsList.toList()
     val inputElements = elementsAndTexts.filterIsInstance<PsiElement>()
     val results = converter.elementsToKotlin(inputElements).results
     val importsToAdd = LinkedHashSet<FqName>()

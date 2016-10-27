@@ -30,7 +30,7 @@ import org.jetbrains.kotlin.psi.psiUtil.siblings
 import java.util.*
 
 data class DataForConversion private constructor(
-        val elementsAndTexts: Collection<Any> /* list consisting of PsiElement's to convert and plain String's */,
+        val elementsAndTexts: ElementAndTextList /* list consisting of PsiElement's to convert and plain String's */,
         val importsAndPackage: String,
         val file: PsiJavaFile
 ) {
@@ -56,7 +56,7 @@ data class DataForConversion private constructor(
                 elementsAndTexts.collectElementsToConvert(file, fileText, TextRange(startOffsets[i], endOffsets[i]))
             }
 
-            return DataForConversion(elementsAndTexts, importsAndPackage, file)
+            return DataForConversion(ElementAndTextList(elementsAndTexts), importsAndPackage, file)
         }
 
         private fun clipTextIfNeeded(file: PsiJavaFile, fileText: String, startOffsets: IntArray, endOffsets: IntArray): String? {
