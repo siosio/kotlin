@@ -38,13 +38,22 @@ import org.jetbrains.kotlin.utils.getOrPutNullable
 import org.jetbrains.org.objectweb.asm.*
 import java.util.*
 
-internal fun getOriginalPositionOfInlinedLine(location: Location, project: Project, searchScope: GlobalSearchScope = GlobalSearchScope.allScope(project)): Pair<KtFile, Int>? {
-    return getOriginalPositionOfInlinedLine(
-            location.lineNumber(),
-            FqName(location.declaringType().name()),
-            location.sourceName(),
-            project,
-            searchScope)
+fun noStrataLineNumber(location: Location, isDexDebug: Boolean, project: Project): Int {
+    if (isDexDebug) {
+        val thisFunLine = runReadAction { getLastLineNumberForLocation(location, project) }
+        if (thisFunLine != null && thisFunLine != location.lineNumber()) {
+            // TODO: bad line because of inlining
+            return thisFunLine
+        }
+
+        val inlinePosition = runReadAction { getOriginalPositionOfInlinedLine(location, project) }
+
+        if (inlinePosition != null) {
+            return inlinePosition.second + 1
+        }
+    }
+
+    return location.lineNumber()
 }
 
 fun getLastLineNumberForLocation(location: Location, project: Project, searchScope: GlobalSearchScope = GlobalSearchScope.allScope(project)): Int? {
@@ -82,8 +91,12 @@ fun getLastLineNumberForLocation(location: Location, project: Project, searchSco
     return lineMapping.values.firstOrNull { it.contains(lineNumber) }?.last()
 }
 
-internal fun getOriginalPositionOfInlinedLine(
-        lineNumber: Int, fqName: FqName, fileName: String, project: Project, searchScope: GlobalSearchScope): Pair<KtFile, Int>? {
+internal fun getOriginalPositionOfInlinedLine(location: Location, project: Project): Pair<KtFile, Int>? {
+    val lineNumber = location.lineNumber()
+    val fqName = FqName(location.declaringType().name())
+    val fileName = location.sourceName()
+    val searchScope = GlobalSearchScope.allScope(project)
+
     val bytes = findAndReadClassFile(fqName, fileName, project, searchScope, { isInlineFunctionLineNumber(it, lineNumber, project) }) ?: return null
     val smapData = readDebugInfo(bytes) ?: return null
     return mapStacktraceLineToSource(smapData, lineNumber, project, SourceLineKind.EXECUTED_LINE, searchScope)
