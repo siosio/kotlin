@@ -161,12 +161,8 @@ class KotlinInlineTypeAliasHandler : InlineActionHandler() {
                 )
 
                 val originalTypeArgumentList = callElement.typeArgumentList
-                if (originalTypeArgumentList != null) {
-                    originalTypeArgumentList.replaced(expandedTypeArgumentList)
-                }
-                else {
-                    callElement.addAfter(expandedTypeArgumentList, callElement.calleeExpression)
-                }
+                originalTypeArgumentList?.replaced(expandedTypeArgumentList)
+                ?: callElement.addAfter(expandedTypeArgumentList, callElement.calleeExpression)
             }
 
             val newCallElement = ((usage.mainReference as KtSimpleNameReference).bindToFqName(

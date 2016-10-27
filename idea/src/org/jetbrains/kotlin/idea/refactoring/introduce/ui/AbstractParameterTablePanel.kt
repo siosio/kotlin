@@ -124,12 +124,7 @@ abstract class AbstractParameterTablePanel<Param, UIParam : AbstractParameterTab
         actionMap.put("invoke_impl", object : AbstractAction() {
             override fun actionPerformed(e: ActionEvent) {
                 val editor = table.cellEditor
-                if (editor != null) {
-                    editor.stopCellEditing()
-                }
-                else {
-                    onEnterAction()
-                }
+                editor?.stopCellEditing() ?: onEnterAction()
             }
         })
 
@@ -137,12 +132,7 @@ abstract class AbstractParameterTablePanel<Param, UIParam : AbstractParameterTab
         actionMap.put("doCancel", object : AbstractAction() {
             override fun actionPerformed(e: ActionEvent) {
                 val editor = table.cellEditor
-                if (editor != null) {
-                    editor.stopCellEditing()
-                }
-                else {
-                    onCancelAction()
-                }
+                editor?.stopCellEditing() ?: onCancelAction()
             }
         })
 
