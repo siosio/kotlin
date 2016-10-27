@@ -23,7 +23,9 @@ import com.intellij.openapi.module.Module
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.util.Ref
 import com.intellij.psi.PsiElement
+import com.intellij.psi.util.ClassUtil
 import com.intellij.psi.util.PsiTreeUtil
+import org.jetbrains.kotlin.asJava.toLightClass
 import org.jetbrains.kotlin.descriptors.FunctionDescriptor
 import org.jetbrains.kotlin.fileClasses.javaFileFacadeFqName
 import org.jetbrains.kotlin.idea.MainFunctionDetector
@@ -63,16 +65,16 @@ class KotlinRunConfigurationProducer : RunConfigurationProducer<JetRunConfigurat
 
     private fun setupConfigurationByQName(module: Module,
                                           configuration: JetRunConfiguration,
-                                          fqName: FqName) {
+                                          fqName: String) {
         configuration.setModule(module)
-        configuration.runClass = fqName.asString()
+        configuration.runClass = fqName
         configuration.setGeneratedName()
     }
 
     override fun isConfigurationFromContext(configuration: JetRunConfiguration, context: ConfigurationContext): Boolean {
         val startClassFQName = getStartClassFqName(getEntryPointContainer(context.location)) ?: return false
 
-        return configuration.runClass == startClassFQName.asString() &&
+        return configuration.runClass == startClassFQName &&
                context.module ==  configuration.configurationModule.module
     }
 
@@ -97,15 +99,15 @@ class KotlinRunConfigurationProducer : RunConfigurationProducer<JetRunConfigurat
             return null
         }
 
-        fun getStartClassFqName(container: KtDeclarationContainer?): FqName? = when(container) {
+        fun getStartClassFqName(container: KtDeclarationContainer?): String? = when(container) {
             null -> null
-            is KtFile -> container.javaFileFacadeFqName
+            is KtFile -> container.javaFileFacadeFqName.asString()
             is KtClassOrObject -> {
                 if (container is KtObjectDeclaration && container.isCompanion()) {
                     val containerClass = container.getParentOfType<KtClass>(true)
-                    containerClass?.fqName
+                    containerClass?.toLightClass()?.let { ClassUtil.getJVMClassName(it) }
                 } else {
-                    container.fqName
+                    container.toLightClass()?.let { ClassUtil.getJVMClassName(it) }
                 }
             }
             else -> throw IllegalArgumentException("Invalid entry-point container: " + (container as PsiElement).text)
