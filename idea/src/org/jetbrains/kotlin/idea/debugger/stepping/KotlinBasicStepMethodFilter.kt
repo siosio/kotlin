@@ -16,31 +16,30 @@
 
 package org.jetbrains.kotlin.idea.debugger.stepping
 
-import com.intellij.debugger.SourcePosition
 import com.intellij.debugger.engine.DebugProcessImpl
 import com.intellij.debugger.engine.NamedMethodFilter
-import com.intellij.debugger.impl.DebuggerUtilsEx
 import com.intellij.util.Range
 import com.sun.jdi.Location
+import org.jetbrains.kotlin.descriptors.*
+import org.jetbrains.kotlin.idea.caches.resolve.resolveToDescriptor
 import org.jetbrains.kotlin.idea.util.application.runReadAction
 import org.jetbrains.kotlin.load.java.JvmAbi
-import org.jetbrains.kotlin.psi.KtAnonymousInitializer
-import org.jetbrains.kotlin.psi.KtConstructor
-import org.jetbrains.kotlin.psi.KtElement
-import org.jetbrains.kotlin.psi.KtPropertyAccessor
+import org.jetbrains.kotlin.psi.KtClass
+import org.jetbrains.kotlin.psi.KtDeclaration
+import org.jetbrains.kotlin.psi.KtProperty
+import org.jetbrains.kotlin.psi.psiUtil.getParentOfTypesAndPredicate
 
 class KotlinBasicStepMethodFilter(
-        val resolvedElement: KtElement,
+        val descriptor: CallableDescriptor,
         val myCallingExpressionLines: Range<Int>
 ) : NamedMethodFilter {
     private val myTargetMethodName: String
 
     init {
-        myTargetMethodName = when (resolvedElement) {
-            is KtAnonymousInitializer -> "<init>"
-            is KtConstructor<*> -> "<init>"
-            is KtPropertyAccessor -> JvmAbi.getterName((resolvedElement.property).name!!)
-            else -> resolvedElement.name!!
+        myTargetMethodName = when (descriptor) {
+            is ClassDescriptor, is ConstructorDescriptor -> "<init>"
+            is PropertyAccessorDescriptor -> JvmAbi.getterName(descriptor.correspondingProperty.name.asString())
+            else -> descriptor.name.asString()
         }
     }
 
@@ -52,13 +51,29 @@ class KotlinBasicStepMethodFilter(
         val method = location.method()
         if (myTargetMethodName != method.name()) return false
 
-        val sourcePosition = runReadAction { SourcePosition.createFromElement(resolvedElement) } ?: return false
         val positionManager = process.positionManager ?: return false
 
-        val classes = positionManager.getAllClasses(sourcePosition)
+        val descriptor = runReadAction {
+            val elementAt = positionManager.getSourcePosition(location)?.elementAt
 
-        return classes.any {
-            it == location.declaringType() || DebuggerUtilsEx.isAssignableFrom(it.name(), location.declaringType())
+            val declaration = elementAt?.getParentOfTypesAndPredicate(false, KtDeclaration::class.java) {
+                it !is KtProperty || !it.isLocal
+            }
+
+            if (declaration is KtClass && method.name() == "<init>") {
+                (declaration.resolveToDescriptor() as? ClassDescriptor)?.constructors?.firstOrNull()
+            } else {
+                declaration?.resolveToDescriptor()
+            }
         }
+
+        if (descriptor == this.descriptor) return true
+
+        if (descriptor is CallableMemberDescriptor) {
+           return descriptor.overriddenDescriptors.any { it == this.descriptor } ||
+                  this.descriptor.overriddenDescriptors.any { it == descriptor }
+        }
+
+        return false
     }
 }
