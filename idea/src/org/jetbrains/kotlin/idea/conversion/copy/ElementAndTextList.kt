@@ -39,6 +39,10 @@ class ElementAndTextList() {
         elementsAndTexts.add(a)
     }
 
+    operator fun plusAssign(other: Collection<PsiElement>): Unit {
+        elementsAndTexts.addAll(other)
+    }
+
     operator fun plus(other: ElementAndTextList): ElementAndTextList {
         val newList = ElementAndTextList()
         newList.elementsAndTexts.addAll(this.elementsAndTexts)
@@ -47,4 +51,18 @@ class ElementAndTextList() {
     }
 
     fun toList(): List<Any> = elementsAndTexts.toList()
+
+    fun process(processor: ElementsAndTextsProcessor) {
+        elementsAndTexts.forEach {
+            when (it) {
+                is PsiElement -> processor.processElement(it)
+                is String -> processor.processText(it)
+            }
+        }
+    }
+}
+
+interface ElementsAndTextsProcessor {
+    fun processElement(element: PsiElement)
+    fun processText(string: String)
 }

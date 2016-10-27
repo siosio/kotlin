@@ -107,7 +107,7 @@ class ConvertTextJavaCopyPasteProcessor : CopyPastePostProcessor<TextBlockTransf
         val dataForConversion = DataForConversion.prepare(copiedJavaCode, project)
 
         val additionalImports = dataForConversion.tryResolveImports(targetFile)
-        var convertedImportsText = convertImportsToKotlin(additionalImports, project).text
+        var convertedImportsText = additionalImports.convertCodeToKotlin(project).text
 
         val convertedText = dataForConversion.convertCodeToKotlin(project).text
 
@@ -136,7 +136,7 @@ class ConvertTextJavaCopyPasteProcessor : CopyPastePostProcessor<TextBlockTransf
     }
 
     private fun DataForConversion.convertCodeToKotlin(project: Project): ConversionResult {
-        return convertCopiedCodeToKotlin(elementsAndTexts, project)
+        return elementsAndTexts.convertCodeToKotlin(project)
     }
 
     private val KtElement.pasteContext: KotlinContext
@@ -226,14 +226,10 @@ class ConvertTextJavaCopyPasteProcessor : CopyPastePostProcessor<TextBlockTransf
     }
 
     private fun DataForConversion.tryResolveImports(targetFile: KtFile): ElementAndTextList {
-        val importResolutionUtil = PlainTextPasteImportResolver(this, targetFile)
-        importResolutionUtil.addImportsFromTargetFile()
-        importResolutionUtil.tryResolveReferences()
-        return ElementAndTextList(importResolutionUtil.addedImports.flatMap { listOf("\n", it) } + "\n\n") //TODO Non-manual formatting for import list
-    }
-
-    private fun convertImportsToKotlin(imports: ElementAndTextList, project: Project): ConversionResult {
-        return convertCopiedCodeToKotlin(imports, project)
+        val importResolver = PlainTextPasteImportResolver(this, targetFile)
+        importResolver.addImportsFromTargetFile()
+        importResolver.tryResolveReferences()
+        return ElementAndTextList(importResolver.addedImports.flatMap { listOf("\n", it) } + "\n\n") //TODO Non-manual formatting for import list
     }
 
     private fun prepareCopiedJavaCodeByContext(text: String, context: JavaContext, target: KtElement): CopiedJavaCode {

@@ -56,11 +56,10 @@ class PlainTextPasteImportResolver(dataForConversion: DataForConversion, val tar
 
     val addedImports = ArrayList<PsiImportStatementBase>()
 
-    private fun canBeImported(p: Pair<PsiElement, DeclarationDescriptorWithVisibility?>): Boolean {
-        val desc = p.second
-        return desc != null
-               && desc.canBeReferencedViaImport()
-               && desc.isVisible(targetFile, null, bindingContext, resolutionFacade)
+    private fun canBeImported(descriptor: DeclarationDescriptorWithVisibility?): Boolean {
+        return descriptor != null
+               && descriptor.canBeReferencedViaImport()
+               && descriptor.isVisible(targetFile, null, bindingContext, resolutionFacade)
     }
 
     private fun addImport(importStatement: PsiImportStatementBase, shouldAddToTarget: Boolean = false) {
@@ -123,12 +122,12 @@ class PlainTextPasteImportResolver(dataForConversion: DataForConversion, val tar
             if (referenceName in failedToResolveReferenceNames) return false
             val classes = shortNameCache.getClassesByName(referenceName, scope)
                     .map { it to it.resolveToDescriptor(resolutionFacade) }
-                    .filter(this::canBeImported)
+                    .filter { canBeImported(it.second) }
 
             classes.find { (psiClass, descriptor) -> JavaToKotlinClassMap.INSTANCE.mapPlatformClass(descriptor!!).isNotEmpty() }
                     ?.let { (psiClass, descriptor) -> addImport(psiElementFactory.createImportStatement(psiClass)) }
-
             if (reference.resolve() != null) return true
+
             classes.singleOrNull()?.let { (psiClass, descriptor) ->
                 addImport(psiElementFactory.createImportStatement(psiClass), true)
             }
@@ -145,7 +144,7 @@ class PlainTextPasteImportResolver(dataForConversion: DataForConversion, val tar
                            shortNameCache.getFieldsByName(referenceName, scope).asList())
                     .map { it as PsiMember }
                     .map { it to it.getJavaMemberDescriptor(resolutionFacade) as? DeclarationDescriptorWithVisibility }
-                    .filter(this::canBeImported)
+                    .filter { canBeImported(it.second) }
 
             members.singleOrNull()?.let { (psiMember, descriptor) ->
                 addImport(psiElementFactory.createImportStaticStatement(psiMember.containingClass!!, psiMember.name!!), true)
