@@ -25,6 +25,7 @@ import com.intellij.debugger.impl.DebuggerContextImpl
 import com.intellij.debugger.impl.JvmSteppingCommandProvider
 import com.intellij.debugger.jdi.StackFrameProxyImpl
 import com.intellij.psi.PsiElement
+import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.xdebugger.impl.XSourcePositionImpl
 import com.sun.jdi.AbsentInformationException
 import com.sun.jdi.LocalVariable
@@ -40,6 +41,8 @@ import org.jetbrains.kotlin.idea.caches.resolve.getResolutionFacade
 import org.jetbrains.kotlin.idea.caches.resolve.resolveToDescriptor
 import org.jetbrains.kotlin.idea.codeInsight.CodeInsightUtils
 import org.jetbrains.kotlin.idea.debugger.DebuggerUtils
+import org.jetbrains.kotlin.idea.debugger.getLastLineNumberForLocation
+import org.jetbrains.kotlin.idea.debugger.getOriginalPositionOfInlinedLine
 import org.jetbrains.kotlin.idea.refactoring.getLineEndOffset
 import org.jetbrains.kotlin.idea.refactoring.getLineNumber
 import org.jetbrains.kotlin.idea.refactoring.getLineStartOffset
@@ -287,12 +290,12 @@ sealed class Action(val position: XSourcePositionImpl? = null,
             is Action.STEP_OUT -> debugProcess.createStepOutCommand(suspendContext).contextAction(suspendContext)
             is Action.STEP_OVER -> debugProcess.createStepOverCommand(suspendContext, ignoreBreakpoints).contextAction(suspendContext)
             is Action.STEP_OVER_INLINED -> KotlinStepActionFactory(debugProcess).createKotlinStepOverInlineAction(
-                    KotlinStepOverInlineFilter(stepOverLines!!, lineNumber ?: -1, inlineRangeVariables!!)).contextAction(suspendContext)
+                    KotlinStepOverInlineFilter(debugProcess.project, stepOverLines!!, lineNumber ?: -1, inlineRangeVariables!!)).contextAction(suspendContext)
         }
     }
 }
 
-interface KotlinMethodFilter: MethodFilter {
+interface KotlinMethodFilter : MethodFilter {
     fun locationMatches(context: SuspendContextImpl, location: Location): Boolean
 }
 
@@ -375,10 +378,17 @@ fun getStepOverAction(
             .dropWhile { it != patchedLocation }
             .drop(1)
             .dropWhile { it.lineNumber() == patchedLocation.lineNumber() }
-            .takeWhile { locationAtLine ->
-                !isLocationSuitable(locationAtLine) || lambdaArgumentRanges.any { locationAtLine.lineNumber() in it }
+            .takeWhile { location ->
+                !isLocationSuitable(location) || lambdaArgumentRanges.any { location.lineNumber() in it }
             }
             .dropWhile { it.lineNumber() == patchedLocation.lineNumber() }
+
+    val project = file.project
+    val quickTest = runReadAction {
+        probablyInlinedLocations.map {
+            getLastLineNumberForLocation(it, project, GlobalSearchScope.allScope(project))
+        }
+    }
 
     if (!probablyInlinedLocations.isEmpty()) {
         return Action.STEP_OVER_INLINED(patchedLocation.lineNumber(), probablyInlinedLocations.map { it.lineNumber() }.toSet(), inlineRangeVariables)

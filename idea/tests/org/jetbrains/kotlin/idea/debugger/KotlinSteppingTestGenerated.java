@@ -511,6 +511,12 @@ public class KotlinSteppingTestGenerated extends AbstractKotlinSteppingTest {
             doStepOverTest(fileName);
         }
 
+        @TestMetadata("soInlineFun.kt")
+        public void testSoInlineFun() throws Exception {
+            String fileName = KotlinTestUtils.navigationMetadata("idea/testData/debugger/tinyApp/src/stepping/stepOver/soInlineFun.kt");
+            doStepOverTest(fileName);
+        }
+
         @TestMetadata("soInlineFunCallInLastStatementOfInlineWithArgumentFromCalleeAndOwn.kt")
         public void testSoInlineFunCallInLastStatementOfInlineWithArgumentFromCalleeAndOwn() throws Exception {
             String fileName = KotlinTestUtils.navigationMetadata("idea/testData/debugger/tinyApp/src/stepping/stepOver/soInlineFunCallInLastStatementOfInlineWithArgumentFromCalleeAndOwn.kt");

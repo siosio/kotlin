@@ -21,9 +21,11 @@ import com.intellij.debugger.engine.DebugProcess
 import com.intellij.debugger.jdi.VirtualMachineProxyImpl
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.search.GlobalSearchScope
 import com.sun.jdi.Location
 import com.sun.jdi.ReferenceType
+import org.jetbrains.kotlin.codegen.inline.InlineCodegenUtil
 import org.jetbrains.kotlin.idea.refactoring.getLineStartOffset
 import org.jetbrains.kotlin.idea.util.application.runReadAction
 import org.jetbrains.kotlin.lexer.KtTokens
@@ -32,9 +34,65 @@ import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtFunction
 import org.jetbrains.kotlin.psi.psiUtil.parents
 import org.jetbrains.kotlin.resolve.jvm.JvmClassName
+import org.jetbrains.kotlin.utils.getOrPutNullable
+import org.jetbrains.org.objectweb.asm.*
+import java.util.*
+
+internal fun getOriginalPositionOfInlinedLine(location: Location, project: Project, searchScope: GlobalSearchScope = GlobalSearchScope.allScope(project)): Pair<KtFile, Int>? {
+    return getOriginalPositionOfInlinedLine(
+            location.lineNumber(),
+            FqName(location.declaringType().name()),
+            location.sourceName(),
+            project,
+            searchScope)
+}
+
+fun getLastLineNumberForLocation(location: Location, project: Project, searchScope: GlobalSearchScope = GlobalSearchScope.allScope(project)): Int? {
+    val lineNumber = location.lineNumber()
+    val fqName = FqName(location.declaringType().name())
+    val fileName = location.sourceName()
+
+    val method = location.method() ?: return null
+
+    val bytes = findAndReadClassFile(fqName, fileName, project, searchScope, { isInlineFunctionLineNumber(it, lineNumber, project) }) ?: return null
+
+    fun readLineNumberTableMapping(bytes: ByteArray): Map<String, Set<Int>> {
+        val labelsToAllStrings = HashMap<String, MutableSet<Int>>()
+
+        ClassReader(bytes).accept(object : ClassVisitor(InlineCodegenUtil.API) {
+            override fun visitMethod(access: Int, name: String?, desc: String?, signature: String?, exceptions: Array<out String>?): MethodVisitor? {
+                if (!(name == method.name() && desc == method.signature())) {
+                    return null
+                }
+
+                return object : MethodVisitor(Opcodes.ASM5, null) {
+                    override fun visitLineNumber(line: Int, start: Label?) {
+                        if (start != null) {
+                            labelsToAllStrings.getOrPutNullable(start.toString(), { LinkedHashSet<Int>() }).add(line)
+                        }
+                    }
+                }
+            }
+        }, ClassReader.SKIP_FRAMES and ClassReader.SKIP_CODE)
+
+        return labelsToAllStrings
+    }
+
+    val lineMapping = readLineNumberTableMapping(bytes)
+    return lineMapping.values.firstOrNull { it.contains(lineNumber) }?.last()
+}
 
 internal fun getOriginalPositionOfInlinedLine(
         lineNumber: Int, fqName: FqName, fileName: String, project: Project, searchScope: GlobalSearchScope): Pair<KtFile, Int>? {
+    val bytes = findAndReadClassFile(fqName, fileName, project, searchScope, { isInlineFunctionLineNumber(it, lineNumber, project) }) ?: return null
+    val smapData = readDebugInfo(bytes) ?: return null
+    return mapStacktraceLineToSource(smapData, lineNumber, project, SourceLineKind.EXECUTED_LINE, searchScope)
+}
+
+internal fun findAndReadClassFile(
+        fqName: FqName, fileName: String, project: Project, searchScope: GlobalSearchScope,
+        sourceFileFilter: (VirtualFile) -> Boolean = { true },
+        libFileFilter: (VirtualFile) -> Boolean = { true }): ByteArray? {
     val internalName = fqName.asString().replace('.', '/')
     val jvmClassName = JvmClassName.byInternalName(internalName)
 
@@ -42,9 +100,7 @@ internal fun getOriginalPositionOfInlinedLine(
 
     val virtualFile = file.virtualFile ?: return null
 
-    val bytes = readClassFile(project, jvmClassName, virtualFile, { isInlineFunctionLineNumber(it, lineNumber, project) }) ?: return null
-    val smapData = readDebugInfo(bytes) ?: return null
-    return mapStacktraceLineToSource(smapData, lineNumber, project, SourceLineKind.EXECUTED_LINE, searchScope)
+    return readClassFile(project, jvmClassName, virtualFile, sourceFileFilter = sourceFileFilter, libFileFilter = libFileFilter)
 }
 
 internal fun getLocationsOfInlinedLine(type: ReferenceType, position: SourcePosition, sourceSearchScope: GlobalSearchScope): List<Location> {

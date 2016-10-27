@@ -1,26 +1,24 @@
-package soInlineFunDex
+package soInlineFun
 
 fun main(args: Array<String>) {
-    val a = 1
-
     //Breakpoint!
     simple()                           // 1
 
-    withParam(1 + a)                   // 2
-
-    withLambda { "hi" }                // 3
-}                                      // 4
+//    withParam(1 + a)
+//
+//    withLambda { "hi" }
+}
 
 inline fun simple() {
     foo()
-}
+}                 // 3
 
 inline fun withParam(i: Int) {
-}
+}                                      // 4
 
 inline fun withLambda(a: () -> Unit) {
-    a()
-}
+    a()                                // 5
+}                                      // 6
 
 fun foo() {}
 

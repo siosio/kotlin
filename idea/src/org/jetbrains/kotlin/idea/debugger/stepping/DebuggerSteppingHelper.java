@@ -55,12 +55,12 @@ public class DebuggerSteppingHelper {
         return debugProcess.new ResumeCommand(suspendContext) {
             @Override
             public void contextAction() {
-                // In DEX there's no strata for trying to understand what lines were inlined and no local variables attributes are
-                // preserved that can be used for fine tuning. So do an ordinal 'step over' instead.
-                if (NoStrataPositionManagerHelperKt.isDexDebug(suspendContext.getDebugProcess())) {
-                    debugProcess.createStepOverCommand(suspendContext, true).contextAction();
-                    return;
-                }
+                //// In DEX there's no strata for trying to understand what lines were inlined and no local variables attributes are
+                //// preserved that can be used for fine tuning. So do an ordinal 'step over' instead.
+                //if (NoStrataPositionManagerHelperKt.isDexDebug(suspendContext.getDebugProcess())) {
+                //    debugProcess.createStepOverCommand(suspendContext, true).contextAction();
+                //    return;
+                //}
 
                 try {
                     StackFrameProxyImpl frameProxy = suspendContext.getFrameProxy();

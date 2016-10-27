@@ -18,19 +18,25 @@ package org.jetbrains.kotlin.idea.debugger.stepping
 
 import com.intellij.debugger.engine.DebugProcessImpl
 import com.intellij.debugger.engine.SuspendContextImpl
+import com.intellij.openapi.project.Project
 import com.intellij.util.Range
 import com.sun.jdi.LocalVariable
 import com.sun.jdi.Location
+import org.jetbrains.kotlin.idea.debugger.getLastLineNumberForLocation
+import org.jetbrains.kotlin.idea.util.application.runReadAction
 
-class KotlinStepOverInlineFilter(val stepOverLines: Set<Int>, val fromLine: Int,
-                                 val inlineFunRangeVariables: List<LocalVariable>) : KotlinMethodFilter {
+class KotlinStepOverInlineFilter(
+        val project: Project,
+        val stepOverLines: Set<Int>, val fromLine: Int,
+        val inlineFunRangeVariables: List<LocalVariable>) : KotlinMethodFilter {
     override fun locationMatches(context: SuspendContextImpl, location: Location): Boolean {
-        val frameProxy = context.frameProxy
-        if (frameProxy == null) return true
+        val frameProxy = context.frameProxy ?: return true
 
-        val currentLine = location.lineNumber()
+        val currentLine = runReadAction {
+            getLastLineNumberForLocation(location, project)
+        }?: location.lineNumber()
 
-        if (!(stepOverLines.contains(location.lineNumber()))) {
+        if (!(stepOverLines.contains(currentLine))) {
             return currentLine != fromLine
         }
 
