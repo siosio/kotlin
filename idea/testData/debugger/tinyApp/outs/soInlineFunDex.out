@@ -4,7 +4,6 @@ Connected to the target VM, address: '!HOST_NAME!:PORT_NAME!', transport: 'socke
 soInlineFunDex.kt:7
 soInlineFunDex.kt:9
 soInlineFunDex.kt:11
-soInlineFunDex.kt:11
 soInlineFunDex.kt:12
 Disconnected from the target VM, address: '!HOST_NAME!:PORT_NAME!', transport: 'socket'
 

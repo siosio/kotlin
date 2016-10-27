@@ -5,11 +5,11 @@ fun main(args: Array<String>) {
     val b = 1                              // 1
 
     foo(                                   // 2
-            fun (){ test(1) }              // 3
+            fun (){ test(1) }
     )
 
-    foo(fun (){ test(1) })                 // 4 5
-}                                          // 6
+    foo(fun (){ test(1) })                 // 3
+}                                          // 4
 
 inline fun foo(f: () -> Unit) {
     f()
