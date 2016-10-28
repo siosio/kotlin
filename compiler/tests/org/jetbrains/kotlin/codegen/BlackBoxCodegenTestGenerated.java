@@ -14848,6 +14848,12 @@ public class BlackBoxCodegenTestGenerated extends AbstractBlackBoxCodegenTest {
             KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/codegen/box/serialization"), Pattern.compile("^(.+)\\.kt$"), true);
         }
 
+        @TestMetadata("serializeCustom.kt")
+        public void testSerializeCustom() throws Exception {
+            String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/box/serialization/serializeCustom.kt");
+            doTest(fileName);
+        }
+
         @TestMetadata("serializeData.kt")
         public void testSerializeData() throws Exception {
             String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/box/serialization/serializeData.kt");
@@ -14860,15 +14866,15 @@ public class BlackBoxCodegenTestGenerated extends AbstractBlackBoxCodegenTest {
             doTest(fileName);
         }
 
-        @TestMetadata("serializeReg.kt")
-        public void testSerializeReg() throws Exception {
-            String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/box/serialization/serializeReg.kt");
+        @TestMetadata("serializeRec.kt")
+        public void testSerializeRec() throws Exception {
+            String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/box/serialization/serializeRec.kt");
             doTest(fileName);
         }
 
-        @TestMetadata("serializeRegExplicit.kt")
-        public void testSerializeRegExplicit() throws Exception {
-            String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/box/serialization/serializeRegExplicit.kt");
+        @TestMetadata("serializeReg.kt")
+        public void testSerializeReg() throws Exception {
+            String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/box/serialization/serializeReg.kt");
             doTest(fileName);
         }
     }

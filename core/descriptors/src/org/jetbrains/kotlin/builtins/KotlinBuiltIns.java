@@ -223,6 +223,7 @@ public abstract class KotlinBuiltIns {
         public final FqName mutableMap = collectionsFqName("MutableMap");
         public final FqName mutableMapEntry = mutableMap.child(Name.identifier("MutableEntry"));
 
+        public final FqName kSerializable = serializationFqName("KSerializable");
         public final FqName kSerializer = serializationFqName("KSerializer");
 
         public final FqNameUnsafe kClass = reflect("KClass");

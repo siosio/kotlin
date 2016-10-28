@@ -1,23 +1,62 @@
 import kotlin.serialization.KInput
 import kotlin.serialization.KOutput
 import kotlin.serialization.KSerializable
+import kotlin.serialization.KSerializer
 import kotlin.serialization.KSerialClassDesc
 
-// Serializable data class
+// Custom serializer
 
-@KSerializable
+@KSerializable(serializer = BoxSerializer::class)
 data class Box(
-        val value1: String,
-        val value2: Int
+        val _value1: String,
+        val _value2: Int
 )
 
-fun box(): String {
+object BoxSerializer : KSerializer<Box> {
+    val desc = object : KSerialClassDesc {
+        override val name = "Box"
+        override val isArray: Boolean = false
+        override fun getElementCount(value: Any?) = 2
+        override fun getElementName(index: Int) = when(index) {
+            0 -> "value1"
+            1 -> "value2"
+            else -> ""
+        }
+        override fun getElementIndex(name: String) = when(name) {
+            "value1" -> 0
+            "value2" -> 1
+            else -> -1
+        }
+    }
+
+    override fun save(output: KOutput, obj : Box) {
+        output.writeBegin(desc)
+        output.writeStringValue(desc, 0, obj._value1)
+        output.writeIntValue(desc, 1, obj._value2)
+        output.writeEnd(desc)
+    }
+
+    override fun load(input: KInput): Box {
+        if (!input.readBegin(desc)) throw java.lang.IllegalStateException()
+        if (input.readElement(desc) != 0) throw java.lang.IllegalStateException()
+        val value1 = input.readStringValue(desc, 0)
+        if (input.readElement(desc) != 1) throw java.lang.IllegalStateException()
+        val value2 = input.readIntValue(desc, 1)
+        if (input.readElement(desc) != KInput.READ_DONE) throw java.lang.IllegalStateException()
+        input.readEnd(desc)
+        return Box(value1, value2)
+    }
+}
+
+fun box() : String {
     val out = Out()
-    out.write(Box, Box("s1", 42))
+    //out.write(Box, Box("s1", 42)) // NO_COMPANION_OBJECT
+    out.write(BoxSerializer, Box("s1", 42))
     out.done()
 
     val inp = Inp()
-    val box = inp.read(Box)
+    //val box = inp.read(Box) // NO_COMPANION_OBJECT
+    val box = inp.read(BoxSerializer)
     inp.done()
 
     return "OK"

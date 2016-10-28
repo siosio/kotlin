@@ -27,6 +27,8 @@ class SerialClassDescImpl(override val name: String) : KSerialClassDesc {
     private var _indices: Map<String, Int>? = null
     private val indices: Map<String, Int> get() = _indices ?: buildIndices()
 
+    override fun getElementCount(value: Any?): Int = names.size
+
     fun addElement(name: String) {
         names.add(name)
     }
@@ -41,4 +43,6 @@ class SerialClassDescImpl(override val name: String) : KSerialClassDesc {
         _indices = indices
         return indices
     }
+
+    override fun toString() = "$name$names"
 }

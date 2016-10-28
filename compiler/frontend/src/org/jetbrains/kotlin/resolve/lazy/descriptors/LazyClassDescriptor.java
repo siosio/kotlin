@@ -483,7 +483,7 @@ public class LazyClassDescriptor extends ClassDescriptorBase implements ClassDes
     }
 
     private LazyClassDescriptor createSerializerCompanionObjectDescriptor() {
-        if (!KSerializationUtil.isSerializable(this) || correspondingClassOrObject == null)
+        if (!KSerializationUtil.isDefaultSerializable(this) || correspondingClassOrObject == null)
             return null;
         Name name = SpecialNames.DEFAULT_NAME_FOR_COMPANION_OBJECT;
         SyntheticClassOrObject syntheticObject = new SyntheticClassOrObject(correspondingClassOrObject, name.asString());

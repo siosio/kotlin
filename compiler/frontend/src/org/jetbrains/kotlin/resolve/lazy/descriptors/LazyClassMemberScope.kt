@@ -218,7 +218,7 @@ open class LazyClassMemberScope(
     }
 
     private fun generateSerializerCompanionClass(name: Name, result: MutableSet<ClassDescriptor>) {
-        if (!thisDescriptor.isSerializable) return
+        if (!thisDescriptor.isDefaultSerializable) return
 
         if (name == SpecialNames.DEFAULT_NAME_FOR_COMPANION_OBJECT && result.none { it.isCompanionObject }) {
             // forces creation of companion object if needed
@@ -318,7 +318,7 @@ open class LazyClassMemberScope(
     }
 
     private fun addSerializerCompanionClass(result: MutableCollection<DeclarationDescriptor>, location: LookupLocation) {
-        if (!thisDescriptor.isSerializable) return
+        if (!thisDescriptor.isDefaultSerializable) return
 
         val descriptor = getClassDescriptor(SpecialNames.DEFAULT_NAME_FOR_COMPANION_OBJECT, location)
         if (descriptor != null)

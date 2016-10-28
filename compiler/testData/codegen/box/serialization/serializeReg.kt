@@ -3,87 +3,99 @@ import kotlin.serialization.KOutput
 import kotlin.serialization.KSerializable
 import kotlin.serialization.KSerialClassDesc
 
-class Out() : KOutput {
+// Regular (non-data) class with matching constructor
+
+@KSerializable
+class Box(p1: String, p2: Int) {
+    var value1: String = p1
+    var value2: Int = p2
+}
+
+fun box(): String {
+    val out = Out()
+    out.write(Box, Box("s1", 42))
+    out.done()
+
+    val inp = Inp()
+    val box = inp.read(Box)
+    inp.done()
+
+    return "OK"
+}
+
+class Failure(s: String) : Throwable(s)
+
+open class State {
     var step = 0
-    var fail: String? = null
 
+    fun fail(msg: String): Nothing = throw Failure("@$step: $msg")
+
+    fun checkBoxDesc(desc: KSerialClassDesc) {
+        if (desc.name != "Box") fail("checkBoxDesc name $desc")
+        if (desc.getElementName(0) != "value1") fail("checkBoxDesc0 $desc")
+        if (desc.getElementName(1) != "value2") fail("checkBoxDesc1 $desc")
+    }
+}
+
+class Out() : State(), KOutput {
     override fun writeBegin(desc: KSerialClassDesc) {
-        if (step == 0) step++ else if (fail == null) fail = "writeBegin"
+        checkBoxDesc(desc)
+        if (step == 0) step++ else fail("writeBegin($desc)")
     }
 
-    override fun writeElement(desc: KSerialClassDesc, index: Int) {
-        when (index) {
-            0 -> if (step == 1) { step++; return }
-            1 -> if (step == 3) { step++; return }
-        }
-        if (fail == null) fail = "writeElement($index)"
-    }
-
-    override fun writeValue(value: Any?) {
+    override fun writeValue(desc: KSerialClassDesc, index: Int, value: Any?) {
+        checkBoxDesc(desc)
         when (step) {
-            2 -> if (value == "s1") { step++; return }
-            4 -> if (value == 42) { step++; return }
+            1 -> if (index == 0 && value == "s1") { step++; return }
+            2 -> if (index == 1 && value == 42) { step++; return }
         }
-        if (fail == null) fail = "writeValue($value)"
+        fail("writeValue($desc, $index, $value)")
     }
 
     override fun writeEnd(desc: KSerialClassDesc) {
-        if (step == 5) step++ else if (fail == null) fail = "writeEnd()"
+        checkBoxDesc(desc)
+        if (step == 3) step++ else fail("writeEnd($desc)")
     }
 
-    fun done() = if (fail == null && step == 6) null else "OUT FAIL AT $step WITH $fail"
+    fun done() {
+        if (step != 4) fail("OUT FAIL")
+    }
 }
 
-class Inp() : KInput {
-    var step = 0
-    var fail: String? = null
-
-    override fun readBegin(desc: KSerialClassDesc) {
-        if (step == 0) step++ else if (fail == null) fail = "readBegin"
+class Inp() : State(), KInput {
+    override fun readBegin(desc: KSerialClassDesc): Boolean {
+        checkBoxDesc(desc)
+        if (step == 0) step++ else fail("readBegin($desc)")
+        return true
     }
 
     override fun readElement(desc: KSerialClassDesc): Int {
+        checkBoxDesc(desc)
         when (step) {
             1 -> { step++; return 0 }
             3 -> { step++; return 1 }
             5 -> { step++; return -1 }
         }
-        if (fail == null) fail = "readElement"
+        fail("readElement($desc)")
         return -1
     }
 
-    override fun readValue(): Any? {
+    override fun readValue(desc: KSerialClassDesc, index: Int): Any? {
+        checkBoxDesc(desc)
         when (step) {
-            2 -> { step++; return "s1" }
-            4 -> { step++; return 42 }
+            2 -> if (index == 0) { step++; return "s1" }
+            4 -> if (index == 1) { step++; return 42 }
         }
-        if (fail == null) fail = "readValue"
+        fail("readValue($desc, $index)")
         return null
     }
 
     override fun readEnd(desc: KSerialClassDesc) {
-        if (step == 6) step++ else if (fail == null) fail = "readEnd"
+        checkBoxDesc(desc)
+        if (step == 6) step++ else fail("readEnd($desc)")
     }
 
-    fun done() = if (fail == null && step == 7) null else "INP FAIL AT $step WITH $fail"
-}
-
-@KSerializable
-class Box(p1: String, p2: Int) {
-    var value1 : String = p1
-    var value2 : Int = p2
-}
-
-fun box() : String {
-    val out = Out()
-    out.write(Box("s1", 42), Box)
-    var done = out.done()
-    if (done != null) return done
-
-    val inp = Inp()
-    val box = inp.read(Box)
-    done = inp.done()
-    if (done != null) return done
-
-    return "OK"
+    fun done() {
+        if (step != 7) fail("INP FAIL")
+    }
 }

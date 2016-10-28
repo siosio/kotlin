@@ -799,8 +799,10 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
     }
 
     private class SerializerCompanionMethodGeneratorImpl extends SerializerCompanionMethodGenerator {
-        private final Type classDescType = Type.getObjectType("kotlin/serialization/KSerialClassDesc");
-        private final Type classDescImplType = Type.getObjectType("kotlin/jvm/internal/serialization/SerialClassDescImpl");
+        private final Type descType = Type.getObjectType("kotlin/serialization/KSerialClassDesc");
+        private final Type descImplType = Type.getObjectType("kotlin/jvm/internal/serialization/SerialClassDescImpl");
+        private final Type serialSaverType = Type.getObjectType("kotlin/serialization/KSerialSaver");
+        private final Type serialLoaderType = Type.getObjectType("kotlin/serialization/KSerialLoader");
 
         SerializerCompanionMethodGeneratorImpl(
                 FirClassOrObject klass,
@@ -814,15 +816,15 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
                 InstructionAdapter iv, int classDescVar,
                 List<? extends PropertyDescriptor> properties
         ) {
-            iv.anew(classDescImplType);
+            iv.anew(descImplType);
             iv.dup();
             iv.aconst(getSerialName());
-            iv.invokespecial(classDescImplType.getInternalName(), "<init>", "(Ljava/lang/String;)V", false);
-            iv.store(classDescVar, classDescImplType);
+            iv.invokespecial(descImplType.getInternalName(), "<init>", "(Ljava/lang/String;)V", false);
+            iv.store(classDescVar, descImplType);
             for (PropertyDescriptor property : properties) {
-                iv.load(classDescVar, classDescImplType);
+                iv.load(classDescVar, descImplType);
                 iv.aconst(property.getName().asString());
-                iv.invokevirtual(classDescImplType.getInternalName(), "addElement", "(Ljava/lang/String;)V", false);
+                iv.invokevirtual(descImplType.getInternalName(), "addElement", "(Ljava/lang/String;)V", false);
             }
         }
 
@@ -839,39 +841,48 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
                         @NotNull MethodContext context,
                         @NotNull MemberCodegen<?> parentCodegen
                 ) {
-                    int objVar = 1;
-                    int outputVar = 2;
-                    int classDescVar = 3;
+                    // fun save(output: KOutput, obj : T)
+                    int outputVar = 1;
+                    int objVar = 2;
+                    int descVar = 3;
                     InstructionAdapter iv = new InstructionAdapter(mv);
-                    generateSerialClassDesc(iv, classDescVar, properties);
-                    Type serialType = signature.getValueParameters().get(0).getAsmType();
-                    Type outputType = signature.getValueParameters().get(1).getAsmType();
-                    // output.writeBegin(classDesc)
+                    generateSerialClassDesc(iv, descVar, properties);
+                    Type outputType = signature.getValueParameters().get(0).getAsmType();
+                    Type objType = signature.getValueParameters().get(1).getAsmType();
+                    // if (obj == null) { output.writeNull(desc); return }
+                    Label writeNotNull = new Label();
+                    iv.load(objVar, objType);
+                    iv.ifnonnull(writeNotNull);
                     iv.load(outputVar, outputType);
-                    iv.load(classDescVar, classDescType);
+                    iv.load(descVar, descType);
+                    iv.invokeinterface(outputType.getInternalName(), "writeNull",
+                                       "(" + descType.getDescriptor() + ")V");
+                    iv.areturn(Type.VOID_TYPE);
+                    // writeNotNull: output.writeBegin(classDesc)
+                    iv.visitLabel(writeNotNull);
+                    iv.load(outputVar, outputType);
+                    iv.load(descVar, descType);
                     iv.invokeinterface(outputType.getInternalName(), "writeBegin",
-                                       "(" + classDescType.getDescriptor() + ")V");
+                                       "(" + descType.getDescriptor() + ")V");
                     // loop for all properties
                     for (int index = 0; index < properties.size(); index++) {
                         PropertyDescriptor property = properties.get(index);
-                        // output.writeElement(classDesc, index)
+                        // output.writeXxxValue(classDesc, index, value)
                         iv.load(outputVar, outputType);
-                        iv.load(classDescVar, classDescType);
-                        iv.aconst(index);
-                        iv.invokeinterface(outputType.getInternalName(), "writeElement",
-                                           "(" + classDescType.getDescriptor() + "I)V");
-                        // output.writeXxxValue(value)
-                        iv.load(outputVar, outputType);
-                        Type propertyType = genPropertyOnStack(iv, context, property, serialType, objVar);
-                        SerializationMethodTypeMapper m = new SerializationMethodTypeMapper(propertyType);
+                        iv.load(descVar, descType);
+                        iv.iconst(index);
+                        Type propertyType = genPropertyOnStack(iv, context, property, objType, objVar);
+                        SerializationMethodTypeMapper m = new SerializationMethodTypeMapper(propertyType, property);
+                        stackValueSerializerInstance(m.serializer, serialSaverType, iv);
                         iv.invokeinterface(outputType.getInternalName(), "write" + m.namePart + "Value",
-                                           "(" + m.type.getDescriptor() + ")V");
+                                           "(" + descType.getDescriptor() + "I" + m.type.getDescriptor() +
+                                            (m.serializer != null ? serialSaverType.getDescriptor() : "") + ")V");
                     }
                     // output.writeEnd(classDesc)
                     iv.load(outputVar, outputType);
-                    iv.load(classDescVar, classDescType);
+                    iv.load(descVar, descType);
                     iv.invokeinterface(outputType.getInternalName(), "writeEnd",
-                                       "(" + classDescType.getDescriptor() + ")V");
+                                       "(" + descType.getDescriptor() + ")V");
                     // return
                     iv.areturn(Type.VOID_TYPE);
                 }
@@ -891,79 +902,57 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
                         @NotNull MethodContext context,
                         @NotNull MemberCodegen<?> parentCodegen
                 ) {
+                    // fun load(input: KInput): T
                     int inputVar = 1;
-                    int classDescVar = 2;
+                    int descVar = 2;
                     int indexVar = 3;
                     int readAllVar = 4;
                     int propsStartVar = 5;
                     InstructionAdapter iv = new InstructionAdapter(mv);
-                    generateSerialClassDesc(iv, classDescVar, properties);
-                    Type returnType = signature.getReturnType();
+                    generateSerialClassDesc(iv, descVar, properties);
+                    Type objType = signature.getReturnType();
                     Type inputType = signature.getValueParameters().get(0).getAsmType();
+                    // boolean readAll = false
+                    iv.iconst(0);
+                    iv.store(readAllVar, Type.BOOLEAN_TYPE);
                     // initialize all prop vars
                     int propVar = propsStartVar;
                     for (PropertyDescriptor property : properties) {
                         Type propertyType = typeMapper.mapType(property.getType());
-                        switch (propertyType.getSort()) {
-                            case Type.BOOLEAN:
-                            case Type.BYTE:
-                            case Type.SHORT:
-                            case Type.CHAR:
-                            case Type.INT:
-                                iv.iconst(0);
-                                break;
-                            case Type.LONG:
-                                iv.lconst(0);
-                                break;
-                            case Type.FLOAT:
-                                iv.fconst(0);
-                                break;
-                            case Type.DOUBLE:
-                                iv.dconst(0);
-                                break;
-                            default:
-                                iv.aconst(null);
-                                break;
-                        }
+                        stackValueDefault(propertyType, iv);
                         iv.store(propVar, propertyType);
                         propVar += propertyType.getSize();
                     }
-                    // input.readBegin(classDesc)
+                    // if (!input.readBegin(classDesc)) return null
                     iv.load(inputVar, inputType);
-                    iv.load(classDescVar, classDescType);
+                    iv.load(descVar, descType);
                     iv.invokeinterface(inputType.getInternalName(), "readBegin",
-                                       "(" + classDescType.getDescriptor() + ")V");
-                    // readElement: int index = input.readElement(classDesc)
+                                       "(" + descType.getDescriptor() + ")Z");
                     Label readElementLabel = new Label();
+                    iv.ifne(readElementLabel);
+                    iv.aconst(null);
+                    iv.areturn(objType);
+                    // readElement: int index = input.readElement(classDesc)
                     iv.visitLabel(readElementLabel);
                     iv.load(inputVar, inputType);
-                    iv.load(classDescVar, classDescType);
+                    iv.load(descVar, descType);
                     iv.invokeinterface(inputType.getInternalName(), "readElement",
-                                       "(" + classDescType.getDescriptor() + ")I");
+                                       "(" + descType.getDescriptor() + ")I");
                     iv.store(indexVar, Type.INT_TYPE);
-                    // boolean readAll = false
-                    iv.iconst(0);
-                    iv.store(readAllVar, Type.BOOLEAN_TYPE);
-                    // if (index == READ_ALL /*-2*/) goto allStart
-                    iv.load(indexVar, Type.INT_TYPE);
-                    iv.aconst(-2);
-                    Label allStartLabel = new Label();
-                    iv.ificmpeq(allStartLabel);
                     // switch(index)
+                    Label readAllLabel = new Label();
                     Label readEndLabel = new Label();
-                    Label defaultLabel = new Label();
-                    Label[] labels = new Label[properties.size() + 1];
-                    labels[0] = readEndLabel;
+                    Label[] labels = new Label[properties.size() + 2];
+                    labels[0] = readAllLabel;
+                    labels[1] = readEndLabel;
                     for (int i = 0; i < properties.size(); i++) {
-                        labels[i + 1] = new Label();
+                        labels[i + 2] = new Label();
                     }
                     iv.load(indexVar, Type.INT_TYPE);
-                    iv.tableswitch(-1, properties.size() - 1, defaultLabel, labels);
-                    // default:
-                    iv.visitLabel(defaultLabel);
-                    // todo: throw exception here
-                    // allStart: readAll := true
-                    iv.visitLabel(allStartLabel);
+                    // todo: readEnd is currently default, should probably throw exception instead
+                    iv.tableswitch(-2, properties.size() - 1, readEndLabel, labels);
+                    // readAll: readAll := true
+                    iv.visitLabel(readAllLabel);
                     iv.iconst(1);
                     iv.store(readAllVar, Type.BOOLEAN_TYPE);
                     // loop for all properties
@@ -971,12 +960,17 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
                     for (int i = 0; i < properties.size(); i++) {
                         PropertyDescriptor property = properties.get(i);
                         // labelI: propX := input.readXxxValue(value)
-                        iv.visitLabel(labels[i + 1]);
+                        iv.visitLabel(labels[i + 2]);
                         iv.load(inputVar, inputType);
+                        iv.load(descVar, descType);
+                        iv.iconst(i);
                         Type propertyType = typeMapper.mapType(property.getType());
-                        SerializationMethodTypeMapper m = new SerializationMethodTypeMapper(propertyType);
+                        SerializationMethodTypeMapper m = new SerializationMethodTypeMapper(propertyType, property);
+                        stackValueSerializerInstance(m.serializer, serialLoaderType, iv);
                         iv.invokeinterface(inputType.getInternalName(), "read" + m.namePart + "Value",
-                                           "()" + m.type.getDescriptor());
+                                           "(" + descType.getDescriptor() + "I" +
+                                           (m.serializer != null ? serialLoaderType.getDescriptor() : "")
+                                           + ")" + m.type.getDescriptor());
                         StackValue.coerce(m.type, propertyType, iv);
                         iv.store(propVar, propertyType);
                         propVar += propertyType.getSize();
@@ -988,11 +982,11 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
                     // readEnd: input.readEnd(classDesc)
                     iv.visitLabel(readEndLabel);
                     iv.load(inputVar, inputType);
-                    iv.load(classDescVar, classDescType);
+                    iv.load(descVar, descType);
                     iv.invokeinterface(inputType.getInternalName(), "readEnd",
-                                       "(" + classDescType.getDescriptor() + ")V");
+                                       "(" + descType.getDescriptor() + ")V");
                     // create object
-                    iv.anew(returnType);
+                    iv.anew(objType);
                     iv.dup();
                     StringBuilder constructorDesc = new StringBuilder("(");
                     propVar = propsStartVar;
@@ -1003,19 +997,53 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
                         propVar += propertyType.getSize();
                     }
                     constructorDesc.append(")V");
-                    iv.invokespecial(returnType.getInternalName(), "<init>", constructorDesc.toString(), false);
+                    iv.invokespecial(objType.getInternalName(), "<init>", constructorDesc.toString(), false);
                     // return
-                    iv.areturn(returnType);
+                    iv.areturn(objType);
                 }
             });
+        }
+
+        // todo: move to StackValue?
+        private void stackValueDefault(Type type, InstructionAdapter iv) {
+            switch (type.getSort()) {
+                case Type.BOOLEAN:
+                case Type.BYTE:
+                case Type.SHORT:
+                case Type.CHAR:
+                case Type.INT:
+                    iv.iconst(0);
+                    break;
+                case Type.LONG:
+                    iv.lconst(0);
+                    break;
+                case Type.FLOAT:
+                    iv.fconst(0);
+                    break;
+                case Type.DOUBLE:
+                    iv.dconst(0);
+                    break;
+                default:
+                    iv.aconst(null);
+                    break;
+            }
+        }
+
+        private void stackValueSerializerInstance(KotlinType serializer, Type type, InstructionAdapter iv) {
+            if (serializer == null)
+                return;
+            //todo: handle cases when serializer is not a singleton
+            ClassDescriptor serializerDescriptor = (ClassDescriptor) serializer.getConstructor().getDeclarationDescriptor();
+            StackValue.singleton(serializerDescriptor, typeMapper).put(type, iv);
         }
     }
 
     private static class SerializationMethodTypeMapper {
         final String namePart;
         final Type type;
+        KotlinType serializer;
 
-        public SerializationMethodTypeMapper(Type type) {
+        public SerializationMethodTypeMapper(Type type, PropertyDescriptor property) {
             switch (type.getSort()) {
                 case Type.BOOLEAN:
                 case Type.BYTE:
@@ -1026,11 +1054,18 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
                 case Type.DOUBLE:
                 case Type.CHAR:
                     String name = type.getClassName();
-                    this.namePart = Character.toUpperCase(name.charAt(0)) + name.substring(1);
+                    namePart = Character.toUpperCase(name.charAt(0)) + name.substring(1);
                     this.type = type;
                     break;
                 case Type.OBJECT:
-                    this.namePart = "";
+                    serializer = KSerializationUtil.getSerializer(property);
+                    if (serializer != null) {
+                        namePart = "Serializable";
+                    } else if (property.getType().isMarkedNullable()) {
+                        namePart = "";
+                    } else {
+                        namePart = "NotNull";
+                    }
                     this.type = Type.getType("Ljava/lang/Object;");
                     break;
                 default:

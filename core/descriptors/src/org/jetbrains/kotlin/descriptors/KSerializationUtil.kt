@@ -19,15 +19,37 @@
 package org.jetbrains.kotlin.descriptors
 
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
-import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.resolve.scopes.DescriptorKindFilter
 import org.jetbrains.kotlin.types.KotlinType
 
-private val K_SERIALIZABLE_ANNOTATION_FQ_NAME = FqName("kotlin.serialization.KSerializable")
+val Annotations.serializer: KotlinType?
+    get() = findAnnotation(KotlinBuiltIns.FQ_NAMES.kSerializable)?.let { annotation ->
+        annotation.allValueArguments.entries.singleOrNull { it.key.name.asString() == "serializer" }?.value?.let { value ->
+            value.value as? KotlinType
+        }
+    }
 
-@get:JvmName("isSerializable")
-val ClassDescriptor.isSerializable: Boolean
-    get() = annotations.hasAnnotation(K_SERIALIZABLE_ANNOTATION_FQ_NAME)
+val KotlinType?.serializer: KotlinType?
+    get() = this?.let {
+        // serializer annotation on this type?
+        it.annotations.serializer?.let { return it }
+        // lookup type's class descriptor
+        val descriptor = it.constructor.declarationDescriptor as? ClassDescriptor ?: return null
+        // serializer annotation on class?
+        descriptor.annotations.serializer?.let { return it }
+        // default serializable?
+        if (descriptor.isDefaultSerializable) return descriptor.companionObjectDescriptor?.defaultType
+        return null
+    }
+
+@get:JvmName("getSerializer")
+val PropertyDescriptor.serializer: KotlinType?
+    get() = annotations.serializer ?: returnType.serializer
+
+@get:JvmName("isDefaultSerializable")
+val ClassDescriptor.isDefaultSerializable: Boolean
+    get() = annotations.hasAnnotation(KotlinBuiltIns.FQ_NAMES.kSerializable) && annotations.serializer == null
 
 val ClassDescriptor.serializableProperties: List<PropertyDescriptor>
     get() = unsubstitutedMemberScope.getContributedDescriptors(DescriptorKindFilter.VARIABLES)
@@ -36,7 +58,7 @@ val ClassDescriptor.serializableProperties: List<PropertyDescriptor>
 fun getSerializableClassDescriptor(companionDescriptor: ClassDescriptor) : ClassDescriptor? {
     if (!companionDescriptor.isCompanionObject) return null
     val classDescriptor = (companionDescriptor.containingDeclaration as? ClassDescriptor) ?: return null
-    if (!classDescriptor.isSerializable) return null
+    if (!classDescriptor.isDefaultSerializable) return null
     return classDescriptor
 }
 

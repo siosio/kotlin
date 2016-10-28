@@ -26,33 +26,42 @@ annotation class KSerializable(
 interface KSerialClassDesc {
     val name: String
     val isArray: Boolean
+    fun getElementCount(value: Any?): Int
     fun getElementName(index: Int): String
     fun getElementIndex(name: String): Int
 }
 
 interface KOutput {
     // top-level api (use)
-    fun <T> write(obj : T, saver: KSerialSaver<T>) = saver.save(obj, this)
+    fun <T> write(saver: KSerialSaver<T>, obj : T) = saver.save(this, obj)
 
-    // object delimiter api (override if needed to prefix/suffix repsentation)
+    // object delimiter api (override if needed to prefix/suffix representation, nothing by default)
     fun writeBegin(desc: KSerialClassDesc) {}
     fun writeEnd(desc: KSerialClassDesc) {}
 
-    // core api (usually override)
-    fun writeElement(desc: KSerialClassDesc, index: Int) {}
-    fun writeValue(value: Any?)
+    // override for a special representation of nulls if needed (empty object by default)
+    fun writeNull(desc: KSerialClassDesc) {
+        writeBegin(desc)
+        writeEnd(desc)
+    }
+
+    // core api (must override)
+    fun writeValue(desc: KSerialClassDesc, index: Int, value: Any?)
 
     // type-specific api (override for performance)
-    fun writeNotNullValue(value: Any) = writeValue(value)
-    fun writeBooleanValue(value: Boolean) = writeNotNullValue(value)
-    fun writeByteValue(value: Byte) = writeNotNullValue(value)
-    fun writeShortValue(value: Short) = writeNotNullValue(value)
-    fun writeIntValue(value: Int) = writeNotNullValue(value)
-    fun writeLongValue(value: Long) = writeNotNullValue(value)
-    fun writeFloatValue(value: Float) = writeNotNullValue(value)
-    fun writeDoubleValue(value: Double) = writeNotNullValue(value)
-    fun writeCharValue(value: Char) = writeNotNullValue(value)
-    fun writeStringValue(value: String) = writeNotNullValue(value)
+    fun writeNotNullValue(desc: KSerialClassDesc, index: Int, value: Any) = writeValue(desc, index, value)
+    fun writeBooleanValue(desc: KSerialClassDesc, index: Int, value: Boolean) = writeNotNullValue(desc, index, value)
+    fun writeByteValue(desc: KSerialClassDesc, index: Int, value: Byte) = writeNotNullValue(desc, index, value)
+    fun writeShortValue(desc: KSerialClassDesc, index: Int, value: Short) = writeNotNullValue(desc, index, value)
+    fun writeIntValue(desc: KSerialClassDesc, index: Int, value: Int) = writeNotNullValue(desc, index, value)
+    fun writeLongValue(desc: KSerialClassDesc, index: Int, value: Long) = writeNotNullValue(desc, index, value)
+    fun writeFloatValue(desc: KSerialClassDesc, index: Int, value: Float) = writeNotNullValue(desc, index, value)
+    fun writeDoubleValue(desc: KSerialClassDesc, index: Int, value: Double) = writeNotNullValue(desc, index, value)
+    fun writeCharValue(desc: KSerialClassDesc, index: Int, value: Char) = writeNotNullValue(desc, index, value)
+    fun writeStringValue(desc: KSerialClassDesc, index: Int, value: String) = writeNotNullValue(desc, index, value)
+
+    // recursive serialization (override for recursion)
+    fun <T> writeSerializableValue(desc: KSerialClassDesc, index: Int, value: T, saver: KSerialSaver<T>) = writeValue(desc, index, value)
 }
 
 interface KInput {
@@ -64,29 +73,34 @@ interface KInput {
     // top-level api (use)
     fun <T> read(loader: KSerialLoader<T>) : T = loader.load(this)
 
-    // object delimiter api (override if needed to prefix/suffix repsentation)
-    fun readBegin(desc: KSerialClassDesc) {}
+    // object delimiter api (override if needed to prefix/suffix representation)
+    fun readBegin(desc: KSerialClassDesc): Boolean = true // shall return 'false' if null is encountered
     fun readEnd(desc: KSerialClassDesc) {}
 
-    // core api (usually override)
+    // unordered read api, override to read props in arbitrary order
     fun readElement(desc: KSerialClassDesc): Int = READ_ALL
-    fun readValue(): Any?
+
+    // core api (must override)
+    fun readValue(desc: KSerialClassDesc, index: Int): Any?
 
     // type-specific api (override for performance)
-    fun readNotNullValue(): Any = readValue()!!
-    fun readBooleanValue(): Boolean = readNotNullValue() as Boolean
-    fun readByteValue(): Byte = readNotNullValue() as Byte
-    fun readShortValue(): Short = readNotNullValue() as Short
-    fun readIntValue(): Int = readNotNullValue() as Int
-    fun readLongValue(): Long = readNotNullValue() as Long
-    fun readFloatValue(): Float = readNotNullValue() as Float
-    fun readDoubleValue(): Double = readNotNullValue() as Double
-    fun readCharValue(): Char = readNotNullValue() as Char
-    fun readStringValue(): String = readNotNullValue() as String
+    fun readNotNullValue(desc: KSerialClassDesc, index: Int): Any = readValue(desc, index)!!
+    fun readBooleanValue(desc: KSerialClassDesc, index: Int): Boolean = readNotNullValue(desc, index) as Boolean
+    fun readByteValue(desc: KSerialClassDesc, index: Int): Byte = readNotNullValue(desc, index) as Byte
+    fun readShortValue(desc: KSerialClassDesc, index: Int): Short = readNotNullValue(desc, index) as Short
+    fun readIntValue(desc: KSerialClassDesc, index: Int): Int = readNotNullValue(desc, index) as Int
+    fun readLongValue(desc: KSerialClassDesc, index: Int): Long = readNotNullValue(desc, index) as Long
+    fun readFloatValue(desc: KSerialClassDesc, index: Int): Float = readNotNullValue(desc, index) as Float
+    fun readDoubleValue(desc: KSerialClassDesc, index: Int): Double = readNotNullValue(desc, index) as Double
+    fun readCharValue(desc: KSerialClassDesc, index: Int): Char = readNotNullValue(desc, index) as Char
+    fun readStringValue(desc: KSerialClassDesc, index: Int): String = readNotNullValue(desc, index) as String
+
+    // recursive serialization (override for recursion)
+    fun <T> readSerializableValue(desc: KSerialClassDesc, index: Int, loader: KSerialLoader<T>) = readValue(desc, index)
 }
 
 interface KSerialSaver<in T> {
-    fun save(obj : T, output: KOutput)
+    fun save(output: KOutput, obj : T)
 }
 
 interface KSerialLoader<out T> {
