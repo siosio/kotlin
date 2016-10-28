@@ -1222,6 +1222,10 @@ fun main(args: Array<String>) {
         testClass<AbstractMultiDeclarationTests>() {
             model("codegen/box/multiDecl/", targetBackend = TargetBackend.JS)
         }
+
+        testClass<AbstractCoroutinesTest> {
+            model("codegen/box/coroutines/", targetBackend = TargetBackend.JS)
+        }
     }
 }
 

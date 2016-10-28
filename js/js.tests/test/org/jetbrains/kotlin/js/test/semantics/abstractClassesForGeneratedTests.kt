@@ -66,3 +66,5 @@ abstract class AbstractBinaryOpTests : BorrowedTest("binaryOp/")
 abstract class AbstractLambdaDestructuringTests : BorrowedTest("destructuringDeclInLambdaParam/")
 
 abstract class AbstractMultiDeclarationTests : BorrowedTest("multiDecl/")
+
+abstract class AbstractCoroutinesTest : BorrowedTest("coroutines/")
