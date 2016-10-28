@@ -1221,6 +1221,10 @@ fun main(args: Array<String>) {
         testClass<AbstractMultiDeclarationTests>() {
             model("codegen/box/multiDecl/", targetBackend = TargetBackend.JS)
         }
+
+        testClass<AbstractPropertyAccessorsInlineTests>() {
+            model("codegen/boxInline/property/", targetBackend = TargetBackend.JS)
+        }
     }
 }
 

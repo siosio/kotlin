@@ -1651,6 +1651,12 @@ public class CompileKotlinAgainstInlineKotlinTestGenerated extends AbstractCompi
             KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/codegen/boxInline/property"), Pattern.compile("^(.+)\\.kt$"), true);
         }
 
+        @TestMetadata("reifiedSimple.kt")
+        public void testReifiedSimple() throws Exception {
+            String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/boxInline/property/reifiedSimple.kt");
+            doTest(fileName);
+        }
+
         @TestMetadata("reifiedVal.kt")
         public void testReifiedVal() throws Exception {
             String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/boxInline/property/reifiedVal.kt");

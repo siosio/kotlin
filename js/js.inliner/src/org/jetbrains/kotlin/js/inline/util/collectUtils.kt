@@ -139,6 +139,7 @@ fun collectNamedFunctions(scope: JsNode): IdentityHashMap<JsName, JsFunction> {
     for ((name, value) in collectJsProperties(scope)) {
         val function: JsFunction? = when (value) {
             is JsFunction -> value
+            is JsObjectLiteral -> value.propertyInitializers?.firstOrNull()?.valueExpr.let { InlineMetadata.decompose(it)?.function }
             else -> InlineMetadata.decompose(value)?.function
         }
 
