@@ -849,17 +849,7 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
                     generateSerialClassDesc(iv, descVar, properties);
                     Type outputType = signature.getValueParameters().get(0).getAsmType();
                     Type objType = signature.getValueParameters().get(1).getAsmType();
-                    // if (obj == null) { output.writeNull(desc); return }
-                    Label writeNotNull = new Label();
-                    iv.load(objVar, objType);
-                    iv.ifnonnull(writeNotNull);
-                    iv.load(outputVar, outputType);
-                    iv.load(descVar, descType);
-                    iv.invokeinterface(outputType.getInternalName(), "writeNull",
-                                       "(" + descType.getDescriptor() + ")V");
-                    iv.areturn(Type.VOID_TYPE);
-                    // writeNotNull: output.writeBegin(classDesc)
-                    iv.visitLabel(writeNotNull);
+                    // output.writeBegin(classDesc)
                     iv.load(outputVar, outputType);
                     iv.load(descVar, descType);
                     iv.invokeinterface(outputType.getInternalName(), "writeBegin",
@@ -867,16 +857,18 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
                     // loop for all properties
                     for (int index = 0; index < properties.size(); index++) {
                         PropertyDescriptor property = properties.get(index);
-                        // output.writeXxxValue(classDesc, index, value)
+                        // output.writeXxxElementValue(classDesc, index, value)
                         iv.load(outputVar, outputType);
                         iv.load(descVar, descType);
                         iv.iconst(index);
-                        Type propertyType = genPropertyOnStack(iv, context, property, objType, objVar);
+                        Type propertyType = typeMapper.mapType(property.getType());
                         SerializationMethodTypeMapper m = new SerializationMethodTypeMapper(propertyType, property);
                         stackValueSerializerInstance(m.serializer, serialSaverType, iv);
-                        iv.invokeinterface(outputType.getInternalName(), "write" + m.namePart + "Value",
-                                           "(" + descType.getDescriptor() + "I" + m.type.getDescriptor() +
-                                            (m.serializer != null ? serialSaverType.getDescriptor() : "") + ")V");
+                        genPropertyOnStack(iv, context, property, objType, objVar);
+                        iv.invokeinterface(outputType.getInternalName(), "write" + m.namePart + "ElementValue",
+                                           "(" + descType.getDescriptor() + "I" +
+                                           (m.serializer != null ? serialSaverType.getDescriptor() : "") +
+                                           m.type.getDescriptor() + ")V");
                     }
                     // output.writeEnd(classDesc)
                     iv.load(outputVar, outputType);
@@ -923,16 +915,13 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
                         iv.store(propVar, propertyType);
                         propVar += propertyType.getSize();
                     }
-                    // if (!input.readBegin(classDesc)) return null
+                    // input.readBegin(classDesc)
                     iv.load(inputVar, inputType);
                     iv.load(descVar, descType);
                     iv.invokeinterface(inputType.getInternalName(), "readBegin",
-                                       "(" + descType.getDescriptor() + ")Z");
-                    Label readElementLabel = new Label();
-                    iv.ifne(readElementLabel);
-                    iv.aconst(null);
-                    iv.areturn(objType);
+                                       "(" + descType.getDescriptor() + ")V");
                     // readElement: int index = input.readElement(classDesc)
+                    Label readElementLabel = new Label();
                     iv.visitLabel(readElementLabel);
                     iv.load(inputVar, inputType);
                     iv.load(descVar, descType);
@@ -967,7 +956,7 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
                         Type propertyType = typeMapper.mapType(property.getType());
                         SerializationMethodTypeMapper m = new SerializationMethodTypeMapper(propertyType, property);
                         stackValueSerializerInstance(m.serializer, serialLoaderType, iv);
-                        iv.invokeinterface(inputType.getInternalName(), "read" + m.namePart + "Value",
+                        iv.invokeinterface(inputType.getInternalName(), "read" + m.namePart + "ElementValue",
                                            "(" + descType.getDescriptor() + "I" +
                                            (m.serializer != null ? serialLoaderType.getDescriptor() : "")
                                            + ")" + m.type.getDescriptor());
@@ -1058,14 +1047,21 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
                     this.type = type;
                     break;
                 case Type.OBJECT:
-                    serializer = KSerializationUtil.getSerializer(property);
-                    if (serializer != null) {
-                        namePart = "Serializable";
-                    } else if (property.getType().isMarkedNullable()) {
-                        namePart = "";
-                    } else {
-                        namePart = "NotNull";
+                    // check for explicit serialization annotation on this property
+                    serializer = KSerializationUtil.getPropertySerializer(property);
+                    if (serializer == null) {
+                        // no explicit serializer for this property. Is it string?
+                        if (KotlinBuiltIns.isString(property.getType())) {
+                            namePart = "String";
+                            this.type = Type.getType("Ljava/lang/String;");
+                            return;
+                        }
+                        // check for serializer defined on the class
+                        serializer = KSerializationUtil.getClassSerializer(property.getType());
                     }
+                    // other classes
+                    namePart = (property.getType().isMarkedNullable() ? "Nullable" : "") +
+                            (serializer != null ? "Serializable" : "");
                     this.type = Type.getType("Ljava/lang/Object;");
                     break;
                 default:

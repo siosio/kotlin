@@ -43,13 +43,20 @@ class Out() : State(), KOutput {
         if (step == 0) step++ else fail("writeBegin($desc)")
     }
 
-    override fun writeValue(desc: KSerialClassDesc, index: Int, value: Any?) {
+    override fun writeStringElementValue(desc: KSerialClassDesc, index: Int, value: String) {
         checkBoxDesc(desc)
         when (step) {
             1 -> if (index == 0 && value == "s1") { step++; return }
+        }
+        fail("writeStringElementValue($desc, $index, $value)")
+    }
+
+    override fun writeIntElementValue(desc: KSerialClassDesc, index: Int, value: Int) {
+        checkBoxDesc(desc)
+        when (step) {
             2 -> if (index == 1 && value == 42) { step++; return }
         }
-        fail("writeValue($desc, $index, $value)")
+        fail("writeIntElementValue($desc, $index, $value)")
     }
 
     override fun writeEnd(desc: KSerialClassDesc) {
@@ -63,10 +70,9 @@ class Out() : State(), KOutput {
 }
 
 class Inp() : State(), KInput {
-    override fun readBegin(desc: KSerialClassDesc): Boolean {
+    override fun readBegin(desc: KSerialClassDesc) {
         checkBoxDesc(desc)
         if (step == 0) step++ else fail("readBegin($desc)")
-        return true
     }
 
     override fun readElement(desc: KSerialClassDesc): Int {
@@ -77,17 +83,22 @@ class Inp() : State(), KInput {
             5 -> { step++; return -1 }
         }
         fail("readElement($desc)")
-        return -1
     }
 
-    override fun readValue(desc: KSerialClassDesc, index: Int): Any? {
+    override fun readStringElementValue(desc: KSerialClassDesc, index: Int): String {
         checkBoxDesc(desc)
         when (step) {
             2 -> if (index == 0) { step++; return "s1" }
+        }
+        fail("readStringlementValue($desc, $index)")
+    }
+
+    override fun readIntElementValue(desc: KSerialClassDesc, index: Int): Int {
+        checkBoxDesc(desc)
+        when (step) {
             4 -> if (index == 1) { step++; return 42 }
         }
-        fail("readValue($desc, $index)")
-        return null
+        fail("readIntElementValue($desc, $index)")
     }
 
     override fun readEnd(desc: KSerialClassDesc) {

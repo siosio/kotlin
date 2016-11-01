@@ -58,19 +58,25 @@ class Out() : State(), KOutput {
         fail("writeBegin($desc)")
     }
 
-    override fun <T> writeSerializableValue(desc: KSerialClassDesc, index: Int, value: T, saver: KSerialSaver<T>) {
+    override fun <T: Any> writeSerializableElementValue(desc: KSerialClassDesc, index: Int, saver: KSerialSaver<T>, value: T) {
         when (step) {
             1 -> { checkContainerDesc(desc); if (index == 0) { step++; saver.save(this, value); return } }
         }
-        fail("writeValue($desc, $index, $value)")
+        fail("writeSerializableElementValue($desc, $index, $value)")
     }
 
-    override fun writeValue(desc: KSerialClassDesc, index: Int, value: Any?) {
+    override fun writeStringElementValue(desc: KSerialClassDesc, index: Int, value: String) {
         when (step) {
             3 -> { checkBoxDesc(desc); if (index == 0 && value == "s1") { step++; return } }
+        }
+        fail("writeStringValue($desc, $index, $value)")
+    }
+
+    override fun writeIntElementValue(desc: KSerialClassDesc, index: Int, value: Int) {
+        when (step) {
             4 -> { checkBoxDesc(desc); if (index == 1 && value == 42) { step++; return } }
         }
-        fail("writeValue($desc, $index, $value)")
+        fail("writeIntElementValue($desc, $index, $value)")
     }
 
     override fun writeEnd(desc: KSerialClassDesc) {
@@ -87,10 +93,10 @@ class Out() : State(), KOutput {
 }
 
 class Inp() : State(), KInput {
-    override fun readBegin(desc: KSerialClassDesc): Boolean {
+    override fun readBegin(desc: KSerialClassDesc) {
         when(step) {
-            0 -> { checkContainerDesc(desc); step++; return true }
-            3 -> { checkBoxDesc(desc); step++; return true }
+            0 -> { checkContainerDesc(desc); step++; return }
+            3 -> { checkBoxDesc(desc); step++; return }
         }
         fail("readBegin($desc)")
     }
@@ -107,19 +113,25 @@ class Inp() : State(), KInput {
         return -1
     }
 
-    override fun <T> readSerializableValue(desc: KSerialClassDesc, index: Int, loader: KSerialLoader<T>): T {
+    override fun <T: Any> readSerializableElementValue(desc: KSerialClassDesc, index: Int, loader: KSerialLoader<T>): T {
         when (step) {
             2 -> { checkContainerDesc(desc); if (index == 0) { step++; return loader.load(this) } }
         }
-        fail("readValue($desc, $index)")
+        fail("readSerializableElementValue($desc, $index)")
     }
 
-    override fun readValue(desc: KSerialClassDesc, index: Int): Any? {
+    override fun readStringElementValue(desc: KSerialClassDesc, index: Int): String {
         when (step) {
             5 -> { checkBoxDesc(desc); if (index == 0) { step++; return "s1" } }
+        }
+        fail("readStringElementValue($desc, $index)")
+    }
+
+    override fun readIntElementValue(desc: KSerialClassDesc, index: Int): Int {
+        when (step) {
             7 -> { checkBoxDesc(desc); if (index == 1) { step++; return 42 } }
         }
-        fail("readValue($desc, $index)")
+        fail("readIntElementValue($desc, $index)")
     }
 
     override fun readEnd(desc: KSerialClassDesc) {

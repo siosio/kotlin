@@ -30,10 +30,10 @@ val Annotations.serializer: KotlinType?
         }
     }
 
-val KotlinType?.serializer: KotlinType?
+// serializer that was declared for original class
+@get:JvmName("getClassSerializer")
+val KotlinType?.classSerializer: KotlinType?
     get() = this?.let {
-        // serializer annotation on this type?
-        it.annotations.serializer?.let { return it }
         // lookup type's class descriptor
         val descriptor = it.constructor.declarationDescriptor as? ClassDescriptor ?: return null
         // serializer annotation on class?
@@ -43,9 +43,17 @@ val KotlinType?.serializer: KotlinType?
         return null
     }
 
-@get:JvmName("getSerializer")
-val PropertyDescriptor.serializer: KotlinType?
-    get() = annotations.serializer ?: returnType.serializer
+// serializer that was declared for this specific type
+val KotlinType?.typeSerializer: KotlinType?
+    get() = this?.let {
+        // serializer annotation on this type?
+        return it.annotations.serializer
+    }
+
+// serializer that was declared specifically for this property via its own annotation or via annotation on its type
+@get:JvmName("getPropertySerializer")
+val PropertyDescriptor.propertySerializer: KotlinType?
+    get() = annotations.serializer ?: type.typeSerializer
 
 @get:JvmName("isDefaultSerializable")
 val ClassDescriptor.isDefaultSerializable: Boolean
