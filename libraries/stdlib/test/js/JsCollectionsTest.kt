@@ -20,13 +20,13 @@ class JsCollectionsTest {
 
     @test fun sort() {
         val list = TEST_LIST.toArrayList()
-        Collections.sort(list)
+        list.sort()
         assertEquals(SORTED_TEST_LIST, list)
     }
 
     @test fun sortWithComparator() {
         val list = TEST_LIST.toArrayList()
-        Collections.sort(list, COMPARATOR)
+        list.sortWith(COMPARATOR)
         assertEquals(SORTED_TEST_LIST, list)
     }
 
