@@ -1,10 +1,10 @@
 package test.collections.js
 
-import java.util.*
-
+import java.util.ArrayList
+import java.util.Comparator
 import kotlin.test.*
-import org.junit.Test as test
 import kotlin.comparisons.*
+import org.junit.Test as test
 
 fun <T> List<T>.toArrayList() = this.toCollection(ArrayList<T>())
 
@@ -15,7 +15,7 @@ class JsCollectionsTest {
     val COMPARATOR = Comparator { x: Int, y: Int ->  if (x > y) 1 else if (x < y) -1 else 0 }
 
     @test fun maxWithComparator() {
-        assertEquals(MAX_ELEMENT, Collections.max(TEST_LIST, COMPARATOR))
+        assertEquals(MAX_ELEMENT, TEST_LIST.maxWith(COMPARATOR))
     }
 
     @test fun sort() {
