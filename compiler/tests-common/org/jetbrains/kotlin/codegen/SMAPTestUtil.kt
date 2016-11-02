@@ -49,7 +49,7 @@ object SMAPTestUtil {
         if (!file.name.endsWith(".smap")) return null
 
         val content = buildString {
-            StringReader(file.content).forEachLine { line ->
+            StringReader(file.content).forEachLine { _ ->
                 // Strip comments
                 if (!line.startsWith("//")) {
                     appendln(line.trim())

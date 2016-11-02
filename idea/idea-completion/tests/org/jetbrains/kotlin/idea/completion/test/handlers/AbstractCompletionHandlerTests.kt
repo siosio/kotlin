@@ -64,7 +64,7 @@ abstract class AbstractCompletionHandlerTest(private val defaultCompletionType: 
                 val index = line.indexOfOrNull('=') ?: error("Invalid code style setting '$line': '=' expected")
                 val settingName = line.substring(0, index).trim()
                 val settingValue = line.substring(index + 1).trim()
-                val (field, settings) = try {
+                val (_, _) = try {
                     kotlinStyleSettings.javaClass.getDeclaredField(settingName) to kotlinStyleSettings
                 }
                 catch (e: NoSuchFieldException) {
