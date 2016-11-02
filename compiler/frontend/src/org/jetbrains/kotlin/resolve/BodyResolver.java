@@ -101,9 +101,14 @@ public class BodyResolver {
 
         resolvePropertyDeclarationBodies(c);
 
-        resolveAnonymousInitializers(c);
+        if (c.getTopDownAnalysisMode().shouldAlwaysResolveBodies()) {
+            resolveAnonymousInitializers(c);
+        }
+
         resolvePrimaryConstructorParameters(c);
-        resolveSecondaryConstructors(c);
+        if (c.getTopDownAnalysisMode().shouldAlwaysResolveBodies()) {
+            resolveSecondaryConstructors(c);
+        }
 
         resolveFunctionBodies(c);
 
@@ -228,7 +233,11 @@ public class BodyResolver {
 
     public void resolveBodies(@NotNull BodiesResolveContext c) {
         resolveBehaviorDeclarationBodies(c);
-        controlFlowAnalyzer.process(c);
+
+        if (c.getTopDownAnalysisMode().shouldAlwaysResolveBodies()) {
+            controlFlowAnalyzer.process(c);
+        }
+
         declarationsChecker.process(c);
         functionAnalyzerExtension.process(c);
     }
@@ -594,17 +603,24 @@ public class BodyResolver {
         KtExpression initializer = property.getInitializer();
         LexicalScope propertyHeaderScope = ScopeUtils.makeScopeForPropertyHeader(getScopeForProperty(c, property), propertyDescriptor);
 
-        if (initializer != null) {
+        boolean isReturnTypeExplicitlySpecified = property.getTypeReference() != null;
+        boolean shouldAlwaysResolveBodies = c.getTopDownAnalysisMode().shouldAlwaysResolveBodies();
+
+        if (initializer != null && (!isReturnTypeExplicitlySpecified || shouldAlwaysResolveBodies)) {
             resolvePropertyInitializer(c.getOuterDataFlowInfo(), property, propertyDescriptor, initializer, propertyHeaderScope);
         }
 
         KtExpression delegateExpression = property.getDelegateExpression();
         if (delegateExpression != null) {
             assert initializer == null : "Initializer should be null for delegated property : " + property.getText();
-            resolvePropertyDelegate(c.getOuterDataFlowInfo(), property, propertyDescriptor, delegateExpression, propertyHeaderScope);
+            if (!isReturnTypeExplicitlySpecified || shouldAlwaysResolveBodies) {
+                resolvePropertyDelegate(c.getOuterDataFlowInfo(), property, propertyDescriptor, delegateExpression, propertyHeaderScope);
+            }
         }
 
-        resolvePropertyAccessors(c, property, propertyDescriptor);
+        if (shouldAlwaysResolveBodies) {
+            resolvePropertyAccessors(c, property, propertyDescriptor);
+        }
     }
 
     private void resolvePropertyDeclarationBodies(@NotNull BodiesResolveContext c) {
@@ -758,12 +774,16 @@ public class BodyResolver {
             LexicalScope scope = c.getDeclaringScope(declaration);
             assert scope != null : "Scope is null: " + PsiUtilsKt.getElementTextWithContext(declaration);
 
-            if (!c.getTopDownAnalysisMode().isLocalDeclarations() && !(bodyResolveCache instanceof BodyResolveCache.ThrowException) &&
-                expressionTypingServices.getStatementFilter() != StatementFilter.NONE) {
-                bodyResolveCache.resolveFunctionBody(declaration).addOwnDataTo(trace, true);
-            }
-            else {
-                resolveFunctionBody(c.getOuterDataFlowInfo(), trace, declaration, entry.getValue(), scope);
+            boolean isUnitFunction = !declaration.hasInitializer() && !declaration.hasDeclaredReturnType();
+
+            if ((!isUnitFunction && !declaration.hasDeclaredReturnType()) || c.getTopDownAnalysisMode().shouldAlwaysResolveBodies()) {
+                if (!c.getTopDownAnalysisMode().isLocalDeclarations() && !(bodyResolveCache instanceof BodyResolveCache.ThrowException) &&
+                    expressionTypingServices.getStatementFilter() != StatementFilter.NONE) {
+                    bodyResolveCache.resolveFunctionBody(declaration).addOwnDataTo(trace, true);
+                }
+                else {
+                    resolveFunctionBody(c.getOuterDataFlowInfo(), trace, declaration, entry.getValue(), scope);
+                }
             }
         }
     }
