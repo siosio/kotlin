@@ -17,6 +17,7 @@
 package org.jetbrains.kotlin.js.coroutine
 
 import com.google.dart.compiler.backend.js.ast.*
+import com.google.dart.compiler.backend.js.ast.metadata.coroutineController
 import com.google.dart.compiler.backend.js.ast.metadata.isHandleResult
 import com.google.dart.compiler.backend.js.ast.metadata.isSuspend
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
@@ -69,7 +70,7 @@ class CoroutineFunctionTransformer(
         val coroutineBlocks = bodyTransformer.postProcess()
 
         for (coroutineBlock in coroutineBlocks) {
-            coroutineBlock.jsBlock.replaceLocalVariables(function.scope)
+            coroutineBlock.jsBlock.replaceLocalVariables(function.scope, bodyTransformer)
             coroutineBlock.jsBlock.replaceHandleResult(bodyTransformer)
         }
 
@@ -241,7 +242,7 @@ class CoroutineFunctionTransformer(
         })
     }
 
-    private fun JsBlock.replaceLocalVariables(scope: JsScope) {
+    private fun JsBlock.replaceLocalVariables(scope: JsScope, transformer: CoroutineBodyTransformer) {
         accept(object : RecursiveJsVisitor() {
             override fun visit(x: JsVars.JsVar) {
                 super.visit(x)
@@ -250,7 +251,15 @@ class CoroutineFunctionTransformer(
         })
 
         val visitor = object : JsVisitorWithContextImpl() {
+            override fun endVisit(x: JsObjectLiteral, ctx: JsContext<in JsNode>) {
+                super.endVisit(x, ctx)
+
+            }
+
             override fun endVisit(x: JsNameRef, ctx: JsContext<in JsNode>) {
+                if (x.coroutineController) {
+                    ctx.replaceMe(JsNameRef(transformer.controllerFieldName, x.qualifier))
+                }
                 if (x.qualifier == null && x.name in localVariables) {
                     val fieldName = scope.getFieldName(x.name!!)
                     ctx.replaceMe(JsNameRef(fieldName, JsLiteral.THIS))
