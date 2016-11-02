@@ -31,25 +31,19 @@ import java.util.regex.Pattern;
 @TestDataPath("$PROJECT_ROOT")
 @RunWith(JUnit3RunnerWithInners.class)
 public class PropertyAccessorsInlineTestsGenerated extends AbstractPropertyAccessorsInlineTests {
+    public void testAllFilesPresentInProperty() throws Exception {
+        KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/codegen/boxInline/property"), Pattern.compile("^(.+)\\.kt$"), true);
+    }
+
     @TestMetadata("reifiedVal.kt")
-    public void ignoredReifiedVal() throws Exception {
+    public void testReifiedVal() throws Exception {
         String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/boxInline/property/reifiedVal.kt");
         doTest(fileName);
     }
 
     @TestMetadata("reifiedVar.kt")
-    public void ignoredReifiedVar() throws Exception {
+    public void testReifiedVar() throws Exception {
         String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/boxInline/property/reifiedVar.kt");
-        doTest(fileName);
-    }
-
-    public void testAllFilesPresentInProperty() throws Exception {
-        KotlinTestUtils.assertAllTestsPresentByMetadata(this.getClass(), new File("compiler/testData/codegen/boxInline/property"), Pattern.compile("^(.+)\\.kt$"), true);
-    }
-
-    @TestMetadata("reifiedSimple.kt")
-    public void testReifiedSimple() throws Exception {
-        String fileName = KotlinTestUtils.navigationMetadata("compiler/testData/codegen/boxInline/property/reifiedSimple.kt");
         doTest(fileName);
     }
 

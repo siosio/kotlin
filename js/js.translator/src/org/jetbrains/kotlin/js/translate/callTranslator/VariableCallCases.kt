@@ -26,6 +26,7 @@ import org.jetbrains.kotlin.descriptors.PropertyDescriptor
 import org.jetbrains.kotlin.descriptors.impl.LocalVariableDescriptor
 import org.jetbrains.kotlin.js.translate.context.Namer
 import org.jetbrains.kotlin.js.translate.context.Namer.getCapturedVarAccessor
+import org.jetbrains.kotlin.js.translate.reference.buildReifiedTypeArgs
 import org.jetbrains.kotlin.js.translate.utils.JsAstUtils.pureFqn
 import org.jetbrains.kotlin.js.translate.utils.JsDescriptorUtils
 import org.jetbrains.kotlin.js.translate.utils.TranslationUtils
@@ -111,7 +112,8 @@ object DefaultVariableAccessCase : VariableAccessCase() {
 
     override fun VariableAccessInfo.extensionReceiver(): JsExpression {
         val functionRef = context.aliasOrValue(callableDescriptor) { context.getQualifiedReference(getAccessDescriptor()) }
-        return  JsInvocation(functionRef, extensionReceiver!!, *additionalArguments.toTypedArray())
+        val reifiedTypeArguments = resolvedCall.typeArguments.buildReifiedTypeArgs(context)
+        return  JsInvocation(functionRef, reifiedTypeArguments + listOf(extensionReceiver!!) + additionalArguments)
     }
 
     override fun VariableAccessInfo.bothReceivers(): JsExpression {
