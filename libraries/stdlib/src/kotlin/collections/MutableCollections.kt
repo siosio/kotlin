@@ -273,3 +273,11 @@ public fun <T : Comparable<T>> MutableList<T>.sort(): Unit {
 public fun <T> MutableList<T>.sortWith(comparator: Comparator<in T>): Unit {
     if (size > 1) java.util.Collections.sort(this, comparator)
 }
+
+/**
+ * Reverses elements in the list in-place.
+ */
+@kotlin.jvm.JvmVersion
+public fun <T> MutableList<T>.reverse(): Unit {
+    java.util.Collections.reverse(this)
+}
